@@ -1,0 +1,1543 @@
+<title>San Dimas Canyon Golf</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap">
+<style>
+  /* One look throughout: dark canyon-green glass over a bright low-poly course, orange for the one thing to press. */
+  :root {
+    color-scheme: dark;
+    --bg-1: #0d2118; --bg-2: #173628;
+    --glass: rgba(18, 38, 28, 0.74); --glass-2: rgba(30, 58, 43, 0.62); --edge: rgba(255, 255, 255, 0.09);
+    --text: #eaf3ec; --muted: #9db6a5; --faint: #6f8a78;
+    --go-1: #f19143; --go-2: #d4542b; --go-text: #fff7f0;
+    --mint: #6fdc8c; --under: #ff7466; --over: #9db6a5; --gold: #f3c969;
+    --font: 'Nunito', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  }
+  html, body { height: 100%; }
+  [hidden] { display: none !important; }
+  body { margin: 0; background: var(--bg-1); color: var(--text); font-family: var(--font); overflow: hidden; -webkit-user-select: none; user-select: none; touch-action: manipulation; }
+  #app { position: fixed; inset: 0; }
+  #view { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  button { font-family: var(--font); color: inherit; cursor: pointer; }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+  .glass { background: var(--glass); border: 1px solid var(--edge); border-radius: 14px; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+  .cap { font-size: 11px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+  .num { font-variant-numeric: tabular-nums; }
+
+  /* ---------------- In-game HUD ---------------- */
+  #hud { position: absolute; inset: 0; pointer-events: none; }
+  #hud .glass, #hud button, #hud canvas { pointer-events: auto; }
+  #leftCol { position: absolute; top: calc(12px + env(safe-area-inset-top, 0px)); left: 12px; display: grid; gap: 8px; width: 196px; }
+  #holeCard { padding: 10px 14px; }
+  #holeCard .t1 { font-size: 18px; font-weight: 900; letter-spacing: 0.01em; }
+  #holeCard .t2 { font-size: 14px; font-weight: 700; color: var(--muted); }
+  #holeCard .t3 { font-size: 12px; font-weight: 700; color: var(--faint); margin-top: 2px; }
+  #distCard { padding: 10px 14px; }
+  #distCard .big { font-size: 34px; font-weight: 900; line-height: 1; }
+  #distCard .big small { font-size: 15px; font-weight: 800; margin-left: 3px; color: var(--muted); }
+  #distCard .lie { font-size: 14px; font-weight: 800; margin-top: 4px; }
+  #distCard .last { font-size: 12px; font-weight: 700; color: var(--faint); }
+  #pills { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+  .pill { padding: 7px 6px; text-align: center; }
+  .pill .v { font-size: 15px; font-weight: 900; display: flex; align-items: center; justify-content: center; gap: 3px; }
+  .pill .cap { font-size: 9px; }
+  #windArrow { width: 16px; height: 16px; }
+  #power.hot .v { color: var(--gold); }
+
+  #topRight { position: absolute; top: calc(12px + env(safe-area-inset-top, 0px)); right: 12px; display: flex; gap: 8px; align-items: flex-start; }
+  .hudBtn { height: 40px; min-width: 40px; padding: 0 12px; border-radius: 12px; font-size: 14px; font-weight: 800; background: var(--glass); border: 1px solid var(--edge); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+  #mapBox { position: absolute; top: calc(60px + env(safe-area-inset-top, 0px)); right: 12px; padding: 6px; }
+  #minimap { display: block; width: 150px; height: 210px; border-radius: 9px; cursor: crosshair; }
+
+  #toast { position: absolute; top: calc(14px + env(safe-area-inset-top, 0px)); left: 50%; transform: translate(-50%, -8px); padding: 9px 18px; font-size: 16px; font-weight: 800; white-space: nowrap; opacity: 0; transition: opacity 0.25s, transform 0.25s; max-width: calc(100vw - 460px); overflow: hidden; text-overflow: ellipsis; pointer-events: none !important; }
+  #toast.show { opacity: 1; transform: translate(-50%, 0); }
+  #skip { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(150px + env(safe-area-inset-bottom, 0px)); padding: 8px 16px; font-size: 13px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; display: none; }
+
+  #bottom { position: absolute; left: 12px; right: 12px; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 8px; justify-items: center; }
+  #shotRow { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+  .toggle { display: flex; align-items: center; padding: 3px; gap: 2px; }
+  .toggle button { width: 34px; height: 34px; border: 0; background: transparent; border-radius: 9px; font-size: 14px; color: var(--muted); }
+  .toggle button:active { background: rgba(255,255,255,0.08); }
+  .toggle span { min-width: 74px; text-align: center; font-size: 14px; font-weight: 800; }
+  #clubBar { display: flex; gap: 6px; padding: 6px; max-width: 100%; overflow-x: auto; scroll-snap-type: x proximity; scrollbar-width: none; }
+  #clubBar::-webkit-scrollbar { display: none; }
+  .club { flex: 0 0 auto; scroll-snap-align: center; min-width: 70px; padding: 6px 8px 7px; border-radius: 10px; border: 1px solid transparent; background: rgba(255,255,255,0.04); text-align: center; line-height: 1.1; }
+  .club .k { font-size: 10px; font-weight: 900; color: var(--faint); }
+  .club .n { display: block; font-size: 13px; font-weight: 900; }
+  .club .y { display: block; font-size: 11px; font-weight: 700; color: var(--muted); }
+  .club[aria-pressed="true"] { background: linear-gradient(160deg, var(--go-1), var(--go-2)); color: var(--go-text); }
+  .club[aria-pressed="true"] .k, .club[aria-pressed="true"] .y { color: rgba(255,247,240,0.85); }
+  #hint { font-size: 12px; font-weight: 800; color: #f3f8f4; text-shadow: 0 1px 3px rgba(0,0,0,0.85), 0 0 8px rgba(0,0,0,0.45); text-align: center; }
+
+  #grab { position: absolute; width: 60px; height: 60px; margin: -30px 0 0 -30px; border-radius: 50%; border: 2.5px solid rgba(255,255,255,0.85); box-shadow: 0 0 0 5px rgba(0,0,0,0.12); pointer-events: none; display: none; }
+  #grab::after { content: 'DRAG BACK'; position: absolute; top: 66px; left: 50%; transform: translateX(-50%); font-size: 11px; font-weight: 900; letter-spacing: 0.14em; white-space: nowrap; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.7); }
+  @media (prefers-reduced-motion: no-preference) { #grab { animation: pulse 1.6s ease-in-out infinite; } }
+  @keyframes pulse { 50% { transform: scale(1.12); border-color: rgba(255,255,255,0.45); } }
+  #pull { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; display: none; z-index: 15; }
+  #pull text { font-family: var(--font); font-weight: 900; font-size: 24px; paint-order: stroke; stroke: rgba(0,0,0,0.55); stroke-width: 5px; }
+
+  /* ---------------- Lobby ---------------- */
+  #lobby { position: absolute; inset: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; touch-action: pan-y; z-index: 18;
+    background: radial-gradient(120% 80% at 50% 0%, rgba(23,54,40,0.84), rgba(13,33,24,0.95) 70%); padding-block: calc(24px + env(safe-area-inset-top, 0px)) 48px; }
+  .wrap { max-width: 940px; margin: 0 auto; padding-inline: 16px; display: grid; gap: 18px; }
+  .top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand svg { width: 30px; height: 40px; flex: 0 0 auto; }
+  .brand h1 { margin: 0; font-size: 28px; font-weight: 900; letter-spacing: -0.01em; line-height: 1.05; }
+  .brand p { margin: 2px 0 0; font-size: 13px; font-weight: 700; color: var(--muted); }
+  #nameChip { display: flex; align-items: center; gap: 8px; padding: 6px 14px 6px 6px; border-radius: 999px; background: var(--glass-2); border: 1px solid var(--edge); font-size: 15px; font-weight: 800; }
+  #nameChip .av { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: #2f8a55; font-size: 13px; font-weight: 900; }
+  #days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; }
+  .day { padding: 10px 4px; border-radius: 12px; border: 1px solid var(--edge); background: var(--glass-2); text-align: center; }
+  .day .d1 { font-size: 11px; font-weight: 900; letter-spacing: 0.08em; color: var(--muted); }
+  .day .d2 { font-size: 21px; font-weight: 900; color: var(--muted); }
+  .day[aria-pressed="true"] { background: linear-gradient(160deg, var(--go-1), var(--go-2)); border-color: transparent; }
+  .day[aria-pressed="true"] .d1, .day[aria-pressed="true"] .d2 { color: var(--go-text); }
+  .rule { display: flex; align-items: center; gap: 12px; font-size: 13px; font-weight: 700; color: var(--muted); }
+  .rule b { color: var(--mint); font-size: 13px; font-weight: 900; letter-spacing: 0.12em; }
+  .rule::after { content: ''; flex: 1; height: 1px; background: var(--edge); }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+  .col { display: grid; gap: 16px; }
+  .panel { background: var(--glass-2); border: 1px solid var(--edge); border-radius: 16px; padding: 16px 18px; }
+  #challenge { position: relative; overflow: hidden; padding: 0; min-height: 190px; }
+  #challenge canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  #challenge .shade { position: absolute; inset: 0; background: linear-gradient(90deg, rgba(8,22,15,0.85) 0%, rgba(8,22,15,0.35) 62%, rgba(8,22,15,0.05) 100%); }
+  #challenge .inner { position: relative; padding: 18px 20px; display: grid; gap: 6px; max-width: 70%; }
+  #challenge h2 { margin: 0; font-size: 28px; font-weight: 900; line-height: 1.05; text-wrap: balance; }
+  #challenge .sub { font-size: 14px; font-weight: 700; color: #d3e3d7; }
+  #challenge .fix { font-size: 12px; font-weight: 700; color: var(--muted); }
+  .btnGo { justify-self: start; border: 0; border-radius: 12px; padding: 11px 18px; font-size: 16px; font-weight: 900; color: var(--go-text); background: linear-gradient(160deg, var(--go-1), var(--go-2)); box-shadow: 0 6px 18px rgba(212,84,43,0.3); }
+  .btnGo:disabled { opacity: 0.55; box-shadow: none; }
+  .btnQuiet { justify-self: start; border: 1px solid var(--edge); border-radius: 12px; padding: 10px 16px; font-size: 15px; font-weight: 800; background: rgba(255,255,255,0.06); }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .dist { display: grid; grid-template-columns: repeat(17, minmax(0, 1fr)); gap: 4px; align-items: end; height: 150px; margin-top: 12px; }
+  .dist .bar { background: rgba(157,182,165,0.45); border-radius: 4px 4px 0 0; min-height: 3px; }
+  .dist .bar.me { background: linear-gradient(180deg, var(--go-1), var(--go-2)); }
+  .distLbl { display: grid; grid-template-columns: repeat(17, minmax(0, 1fr)); gap: 4px; margin-top: 6px; }
+  .distLbl span { font-size: 10px; font-weight: 800; color: var(--faint); text-align: center; }
+  .boardHead { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .tabs { display: flex; padding: 3px; border-radius: 10px; background: rgba(0,0,0,0.2); border: 1px solid var(--edge); }
+  .tabs button { border: 0; background: transparent; padding: 5px 10px; border-radius: 8px; font-size: 13px; font-weight: 800; color: var(--muted); }
+  .tabs button[aria-pressed="true"] { background: rgba(111,220,140,0.16); color: var(--text); }
+  ol.board { list-style: none; margin: 0; padding: 0; display: grid; }
+  ol.board li { display: grid; grid-template-columns: 34px 1fr auto auto; gap: 10px; align-items: center; padding: 8px 4px; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 15px; font-weight: 800; }
+  ol.board li .rk { color: var(--muted); text-align: right; font-weight: 900; }
+  ol.board li .who { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  ol.board li .meta { font-size: 11px; font-weight: 800; color: var(--faint); }
+  ol.board li .sc { min-width: 36px; text-align: right; font-weight: 900; }
+  ol.board li.me { background: rgba(241,145,67,0.12); border-radius: 8px; }
+  .under { color: var(--under); } .even { color: var(--text); } .over { color: var(--over); }
+  .empty { font-size: 14px; font-weight: 700; color: var(--muted); padding: 10px 2px; }
+  ol.board li.empty { display: block; border: 0; }
+  .more { margin-top: 10px; font-size: 14px; font-weight: 900; color: var(--mint); background: none; border: 0; padding: 0; }
+  .seg { display: flex; flex-wrap: wrap; gap: 6px; }
+  .seg button { border: 1px solid var(--edge); background: rgba(255,255,255,0.05); border-radius: 10px; padding: 8px 11px; font-size: 14px; font-weight: 800; color: var(--muted); }
+  .seg button[aria-pressed="true"] { background: rgba(111,220,140,0.16); border-color: rgba(111,220,140,0.35); color: var(--text); }
+  .kv { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--edge); border-radius: 12px; overflow: hidden; }
+  .kv div { padding: 10px 12px; }
+  .kv div + div { border-left: 1px solid var(--edge); }
+  .kv b { display: block; font-size: 20px; font-weight: 900; color: var(--gold); }
+  .kv small { font-size: 12px; font-weight: 700; color: var(--muted); }
+  .panel h3 { margin: 0 0 4px; font-size: 20px; font-weight: 900; }
+  .panel p { margin: 0; font-size: 14px; font-weight: 600; color: var(--muted); line-height: 1.45; }
+  .fine { font-size: 12px; font-weight: 600; color: var(--faint); line-height: 1.5; }
+  .fine a { color: var(--muted); }
+
+  /* ---------------- Sheets ---------------- */
+  .sheet { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(4, 12, 8, 0.6); padding: 16px; box-sizing: border-box; z-index: 25; }
+  .dialog { width: min(760px, 100%); max-height: calc(100% - 8px); overflow: auto; background: #152e22; border: 1px solid var(--edge); border-radius: 18px; box-shadow: 0 24px 70px rgba(0,0,0,0.5); padding: 20px; display: grid; gap: 14px; touch-action: pan-y; }
+  .dialog h2 { margin: 0; font-size: 24px; font-weight: 900; text-wrap: balance; }
+  .dialog .sub { margin: 0; font-size: 14px; font-weight: 700; color: var(--muted); }
+  #nameSheet .dialog { width: min(380px, 100%); text-align: center; justify-items: center; }
+  #nameInput { width: 100%; box-sizing: border-box; padding: 12px 14px; border-radius: 12px; border: 1px solid rgba(241,145,67,0.55); background: rgba(0,0,0,0.25); color: var(--text); font-family: var(--font); font-size: 17px; font-weight: 800; text-align: center; -webkit-user-select: text; user-select: text; }
+  #nameSheet .btnGo { justify-self: stretch; }
+  #nameErr { font-size: 13px; font-weight: 700; color: var(--under); min-height: 16px; }
+  .bigScore { font-size: 54px; font-weight: 900; line-height: 1; }
+  .sc-wrap { overflow-x: auto; }
+  table.sc { border-collapse: collapse; width: 100%; font-size: 14px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  table.sc th, table.sc td { border-bottom: 1px solid var(--edge); padding: 7px 5px; text-align: center; }
+  table.sc th { font-size: 11px; color: var(--muted); letter-spacing: 0.06em; }
+  table.sc th:first-child, table.sc td:first-child { text-align: left; white-space: nowrap; color: var(--muted); }
+  table.sc tr.you td { color: var(--text); font-size: 16px; }
+  table.sc td.cur { box-shadow: inset 0 -2px 0 var(--go-1); }
+  .ss { display: inline-grid; place-items: center; min-width: 26px; height: 26px; }
+  .ss.birdie { border: 2px solid var(--under); border-radius: 50%; color: var(--under); }
+  .ss.eagle { border: 2px solid var(--gold); border-radius: 50%; color: var(--gold); box-shadow: 0 0 0 2px #152e22, 0 0 0 4px var(--gold); }
+  .ss.bogey { border: 2px solid var(--muted); border-radius: 5px; }
+  .ss.double { border: 2px solid var(--muted); border-radius: 5px; box-shadow: 0 0 0 2px #152e22, 0 0 0 4px var(--muted); }
+  #loading { position: absolute; inset: 0; display: grid; place-items: center; background: var(--bg-1); z-index: 40; font-size: 16px; font-weight: 900; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+
+  @media (max-width: 720px) {
+    .grid2 { grid-template-columns: 1fr; }
+    #days { gap: 5px; } .day .d2 { font-size: 17px; }
+    #challenge .inner { max-width: 100%; }
+  }
+  @media (max-width: 640px) {
+    #leftCol { width: 150px; gap: 6px; }
+    #holeCard, #distCard { padding: 8px 10px; }
+    #holeCard .t1 { font-size: 15px; } #holeCard .t2 { font-size: 12px; } #holeCard .t3 { display: none; }
+    #distCard .big { font-size: 26px; } #distCard .last { display: none; }
+    #pills { grid-template-columns: 1fr 1fr; } #power { display: none; }
+    #minimap { width: 104px; height: 146px; }
+    #toast { max-width: calc(100vw - 32px); top: auto; bottom: calc(190px + env(safe-area-inset-bottom, 0px)); font-size: 14px; }
+    #hint { display: none; }
+    #aimToggle { display: none; }
+    .toggle span { min-width: 64px; }
+    .club { min-width: 62px; }
+    .brand h1 { font-size: 23px; }
+  }
+  @media (prefers-reduced-motion: reduce) { #toast { transition: none; } }
+</style>
+
+<div id="app">
+  <canvas id="view" aria-label="3D view of the hole"></canvas>
+
+  <div id="hud" hidden>
+    <div id="leftCol">
+      <div class="glass" id="holeCard" aria-live="polite"><div class="t1" id="hT1">Hole 1/18 · Par 4</div><div class="t2 num" id="hT2">Stroke 1 · E</div><div class="t3 num" id="hT3"></div></div>
+      <div class="glass" id="distCard"><div class="big num" id="dBig">0<small>yd</small></div><div class="lie" id="dLie">Tee</div><div class="last num" id="dLast">last shot —</div></div>
+      <div id="pills">
+        <div class="glass pill" title="Wind relative to your aim"><div class="v num"><svg id="windArrow" viewBox="-10 -10 20 20" aria-hidden="true"><path id="windPath" d="M0 -8 L5 1 L1.5 0 L1.5 8 L-1.5 8 L-1.5 0 L-5 1 Z" fill="currentColor"/></svg><span id="windMph">0</span></div><div class="cap">Wind mph</div></div>
+        <div class="glass pill"><div class="v num" id="elev">0 ft</div><div class="cap">Elevation</div></div>
+        <div class="glass pill" id="power"><div class="v num" id="powerV">0%</div><div class="cap">Power</div></div>
+      </div>
+    </div>
+    <div id="topRight">
+      <button class="hudBtn" id="mapBtn" aria-pressed="true">⚑ Map</button>
+      <button class="hudBtn" id="cardBtn">☰ Scorecard</button>
+    </div>
+    <div class="glass" id="mapBox"><canvas id="minimap" width="300" height="420" aria-label="Hole map. Tap to aim."></canvas></div>
+    <div class="glass" id="toast" role="status"></div>
+    <button class="glass" id="skip">Tap to skip</button>
+    <div id="bottom">
+      <div id="shotRow">
+        <div class="glass toggle" title="Shot shape (A / D)"><button id="shapeL" aria-label="Draw">◀</button><span id="shapeV">Straight</span><button id="shapeR" aria-label="Fade">▶</button></div>
+        <div class="glass toggle" title="Trajectory (W / S)"><button id="trajD" aria-label="Lower">▼</button><span id="trajV">Normal</span><button id="trajU" aria-label="Higher">▲</button></div>
+        <div class="glass toggle" id="aimToggle" title="Fine aim (← / →)"><button id="aimL" aria-label="Aim left">↺</button><span>Aim</span><button id="aimR" aria-label="Aim right">↻</button></div>
+      </div>
+      <div class="glass" id="clubBar" role="toolbar" aria-label="Clubs"></div>
+      <div id="hint">Drag back from the ball to set power, release to hit · A/D draw &amp; fade · W/S higher &amp; lower · 1–0 clubs · Esc cancels · M mutes</div>
+    </div>
+    <div id="grab" aria-hidden="true"></div>
+    <svg id="pull" aria-hidden="true"><line id="pullLine" stroke-width="3.5" stroke-linecap="round"/><circle id="pullDot" r="10" fill="rgba(255,255,255,0.92)"/><text id="pullTxt" text-anchor="middle" fill="#fff"></text></svg>
+  </div>
+
+  <div id="lobby" hidden>
+    <div class="wrap">
+      <div class="top">
+        <div class="brand">
+          <svg viewBox="0 0 30 40" aria-hidden="true"><rect x="5" y="3" width="2.4" height="34" rx="1.2" fill="#eaf3ec"/><path d="M7.4 4 L25 9.5 L7.4 15 Z" fill="#f0643c"/><ellipse cx="6.2" cy="37" rx="6" ry="2.2" fill="#2d5a3f"/></svg>
+          <div><h1>San Dimas Canyon</h1><p>The daily golf game for San Dimas · 18 holes · par 72</p></div>
+        </div>
+        <button id="nameChip"><span class="av" id="nameAv">?</span><span id="nameTxt">Pick a name</span></button>
+      </div>
+      <div id="days" role="group" aria-label="Pick a day"></div>
+      <div class="rule"><b id="dayLbl">TODAY</b><span id="dayLong"></span></div>
+      <div class="grid2">
+        <div class="col">
+          <div class="panel" id="challenge">
+            <canvas id="chCanvas" aria-hidden="true"></canvas><div class="shade"></div>
+            <div class="inner">
+              <div class="cap">Daily challenge</div>
+              <h2 id="chTitle">Three holes</h2>
+              <div class="sub" id="chSub"></div>
+              <div class="fix">White tees · 10-handicap distances · same pins and wind for everyone</div>
+              <div class="row" style="margin-top:6px"><button class="btnGo" id="chPlay">Play →</button><button class="btnQuiet" id="chPractice" hidden>Practice</button></div>
+            </div>
+          </div>
+          <div class="panel"><div class="cap">Score distribution</div><div class="dist" id="dist"></div><div class="distLbl" id="distLbl"></div></div>
+        </div>
+        <div class="panel">
+          <div class="boardHead"><div class="cap" id="boardTitle">Today's leaderboard</div><div class="tabs" role="group"><button id="tabDay" aria-pressed="true">Daily</button><button id="tabRounds" aria-pressed="false">18 holes</button></div></div>
+          <ol class="board" id="board"></ol>
+          <button class="more" id="boardMore" hidden>Full leaderboard →</button>
+        </div>
+      </div>
+      <div class="rule"><b>MORE WAYS TO PLAY</b></div>
+      <div class="grid2">
+        <div class="panel" style="display:grid;gap:12px">
+          <div><h3>Free play</h3><p>The full 18 holes at your own pace. Your round goes on the 18-hole leaderboard.</p></div>
+          <div class="kv"><div><small>Course record</small><b id="recAll">—</b><small id="recWho"></small></div><div><small>Your best</small><b id="recMe">—</b><small id="recMeSub">not played</small></div></div>
+          <div class="seg" id="teeSeg"></div>
+          <div class="seg" id="levelSeg"></div>
+          <div class="row"><button class="btnGo" id="freeGo">Tee off →</button><button class="btnQuiet" id="freeResume" hidden>Resume round</button></div>
+        </div>
+        <div class="panel" style="display:grid;gap:10px">
+          <div><h3>How to play</h3><p>Put your finger on the ball, drag back to set power, and let go. Pull straight back for a straight shot; lean right and it hooks, lean left and it slices. Drag anywhere else to aim, or tap the map. Pick clubs along the bottom, shape the shot with ◀ ▶ and flight it with ▼ ▲. On the green, the arrows show the break.</p></div>
+          <p class="fine">The real course: holes, bunkers, greens and water traced by <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">© OpenStreetMap contributors</a>, on USGS 3DEP 1-metre elevation. Ball flight calibrated to TrackMan tour averages. Unofficial fan game; not affiliated with the course.</p>
+          <p class="fine" id="netNote"></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sheet" id="nameSheet" hidden>
+    <form class="dialog" id="nameForm" role="dialog" aria-labelledby="nameTitle">
+      <h2 id="nameTitle">Enter your name</h2>
+      <p class="sub">It goes on the leaderboard. No account, no password.</p>
+      <input id="nameInput" maxlength="20" autocomplete="nickname" placeholder="Your name" aria-label="Your name">
+      <div id="nameErr" role="alert"></div>
+      <button class="btnGo" type="submit">Continue</button>
+    </form>
+  </div>
+
+  <div class="sheet" id="scoreSheet" hidden>
+    <div class="dialog" role="dialog" aria-labelledby="scTitle">
+      <div><h2 id="scTitle">Scorecard</h2><p class="sub" id="scSub"></p></div>
+      <div id="resultBox" hidden><div class="bigScore num" id="resultBig">Par</div><p class="sub" id="resultSub" style="margin-top:6px"></p></div>
+      <div class="sc-wrap"><table class="sc" id="scTable"></table></div>
+      <div id="resultBoard" hidden><div class="cap" style="margin-bottom:6px" id="resultBoardTitle">Today's leaderboard</div><ol class="board" id="resultList"></ol></div>
+      <div class="row" id="scButtons"></div>
+    </div>
+  </div>
+
+  <div id="loading">Building the course…</div>
+</div>
+
+<script>/*__DATA__*/</script>
+<script>/*__PHYSICS__*/</script>
+<script>/*__SUPABASE__*/</script>
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.min.js" } }</script>
+<script type="module">
+import * as THREE from 'three';
+
+const P = GolfPhysics, S = P.S;
+const YD = 0.9144, FT = 0.3048, MPH = 0.44704;
+const $ = id => document.getElementById(id);
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('sdc18:' + k); return v ? JSON.parse(v) : d; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem('sdc18:' + k, JSON.stringify(v)); } catch { /* storage unavailable */ } },
+};
+
+// ---------------------------------------------------------------- Dates: everyone shares San Dimas's calendar day
+const TZ = 'America/Los_Angeles';
+function ptDay(offset = 0) {
+  const d = new Date(Date.now() + offset * 86400000);
+  const p = new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(d);
+  const g = t => p.find(x => x.type === t).value;
+  return `${g('year')}-${g('month')}-${g('day')}`;
+}
+const seedOf = day => Number(day.replace(/-/g, ''));
+const dayDate = day => new Date(day + 'T12:00:00');
+
+// ---------------------------------------------------------------- Terrain grids
+function decodeGrid(g) {
+  const bin = atob(g.b64), n = g.nx * g.ny, z = new Float32Array(n);
+  for (let i = 0; i < n; i++) z[i] = g.zmin + (bin.charCodeAt(2 * i) | (bin.charCodeAt(2 * i + 1) << 8)) * g.res;
+  return { ...g, z, x1: g.x0 + (g.nx - 1) * g.step, y1: g.y0 + (g.ny - 1) * g.step };
+}
+const DEM = decodeGrid(COURSE.dem), BG = decodeGrid(COURSE.bg);
+function gridH(G, x, y) {
+  let fx = (x - G.x0) / G.step, fy = (y - G.y0) / G.step;
+  fx = Math.max(0, Math.min(G.nx - 1.001, fx)); fy = Math.max(0, Math.min(G.ny - 1.001, fy));
+  const i = fx | 0, j = fy | 0, u = fx - i, v = fy - j, k = j * G.nx + i;
+  return (G.z[k] * (1 - u) + G.z[k + 1] * u) * (1 - v) + (G.z[k + G.nx] * (1 - u) + G.z[k + G.nx + 1] * u) * v;
+}
+const inDem = (x, y) => x > DEM.x0 && x < DEM.x1 && y > DEM.y0 && y < DEM.y1;
+const height = (x, y) => inDem(x, y) ? gridH(DEM, x, y) : gridH(BG, x, y);
+function normalAt(x, y) {
+  const e = 1.0, dzx = (height(x + e, y) - height(x - e, y)) / (2 * e), dzy = (height(x, y + e) - height(x, y - e)) / (2 * e);
+  const l = Math.hypot(dzx, dzy, 1);
+  return { x: -dzx / l, y: -dzy / l, z: 1 / l };
+}
+const Z0 = Math.floor(DEM.zmin) - 2;              // keeps render coordinates small
+const toV = (x, y, z) => new THREE.Vector3(x, z - Z0, -y);
+
+// ---------------------------------------------------------------- Lie map (scanline-rasterised polygons)
+const LPM = 2;
+const LX0 = DEM.x0, LY1 = DEM.y1, LW = Math.ceil((DEM.x1 - DEM.x0) * LPM), LH = Math.ceil((DEM.y1 - DEM.y0) * LPM);
+const lie = new Uint8Array(LW * LH);
+function fillRings(rings, code, only) {
+  let ymin = Infinity, ymax = -Infinity;
+  for (const r of rings) for (const p of r) { ymin = Math.min(ymin, p[1]); ymax = Math.max(ymax, p[1]); }
+  const r0 = Math.max(0, Math.floor((LY1 - ymax) * LPM)), r1 = Math.min(LH - 1, Math.ceil((LY1 - ymin) * LPM));
+  const xs = [];
+  for (let row = r0; row <= r1; row++) {
+    const y = LY1 - (row + 0.5) / LPM; xs.length = 0;
+    for (const r of rings) for (let i = 0, j = r.length - 1; i < r.length; j = i++) {
+      const a = r[i], b = r[j];
+      if ((a[1] > y) !== (b[1] > y)) xs.push(a[0] + (y - a[1]) * (b[0] - a[0]) / (b[1] - a[1]));
+    }
+    xs.sort((p, q) => p - q);
+    for (let k = 0; k + 1 < xs.length; k += 2) {
+      const c0 = Math.max(0, Math.ceil((xs[k] - LX0) * LPM - 0.5)), c1 = Math.min(LW - 1, Math.floor((xs[k + 1] - LX0) * LPM - 0.5));
+      for (let c = c0; c <= c1; c++) { const idx = row * LW + c; if (!only || only.includes(lie[idx])) lie[idx] = code; }
+    }
+  }
+}
+function strokeLines(lines, halfW, code, only, ring) {
+  for (const L of lines) {
+    const n = ring ? L.length : L.length - 1;
+    for (let s = 0; s < n; s++) {
+      const a = L[s], b = L[(s + 1) % L.length];
+      const xmin = Math.min(a[0], b[0]) - halfW, xmax = Math.max(a[0], b[0]) + halfW, ymin = Math.min(a[1], b[1]) - halfW, ymax = Math.max(a[1], b[1]) + halfW;
+      const c0 = Math.max(0, Math.floor((xmin - LX0) * LPM)), c1 = Math.min(LW - 1, Math.ceil((xmax - LX0) * LPM));
+      const r0 = Math.max(0, Math.floor((LY1 - ymax) * LPM)), r1 = Math.min(LH - 1, Math.ceil((LY1 - ymin) * LPM));
+      const dx = b[0] - a[0], dy = b[1] - a[1], L2 = dx * dx + dy * dy || 1e-9;
+      for (let row = r0; row <= r1; row++) for (let c = c0; c <= c1; c++) {
+        const x = LX0 + (c + 0.5) / LPM, y = LY1 - (row + 0.5) / LPM;
+        const u = Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / L2));
+        if (Math.hypot(x - a[0] - u * dx, y - a[1] - u * dy) <= halfW) { const idx = row * LW + c; if (!only || only.includes(lie[idx])) lie[idx] = code; }
+      }
+    }
+  }
+}
+const F = COURSE.features;
+const ringsOf = f => [f.o, ...(f.i || [])];
+fillRings([COURSE.boundary], S.ROUGH);
+for (const f of (F.rough || [])) fillRings(ringsOf(f), S.ROUGH);
+for (const f of (F.driving_range || [])) fillRings(ringsOf(f), S.NATIVE);
+for (const f of F.fairway) fillRings(ringsOf(f), S.FAIRWAY);
+for (const f of F.tee) fillRings(ringsOf(f), S.TEE);
+const teePad = p => [...Array(16)].map((_, a) => [p[0] + 3.2 * Math.cos(a / 8 * Math.PI), p[1] + 3.2 * Math.sin(a / 8 * Math.PI)]);
+for (const h of COURSE.holes) for (const p of Object.values(h.tees)) fillRings([teePad(p)], S.TEE, [S.ROUGH, S.FAIRWAY, S.FRINGE, S.NATIVE]);
+strokeLines(F.green.map(g => g.o), 1.5, S.FRINGE, [S.ROUGH, S.FAIRWAY, S.TEE], true);
+for (const f of F.green) fillRings(ringsOf(f), S.GREEN);
+for (const f of F.bunker) fillRings(ringsOf(f), S.BUNKER);
+for (const f of F.water) fillRings(ringsOf(f), S.WATER);
+strokeLines(F.cartpath, 1.2, S.PATH, [S.ROUGH, S.FAIRWAY, S.FRINGE, S.TEE, S.NATIVE]);
+function surface(x, y) {
+  const c = Math.floor((x - LX0) * LPM), r = Math.floor((LY1 - y) * LPM);
+  if (c < 0 || r < 0 || c >= LW || r >= LH) return S.OB;
+  return lie[r * LW + c];
+}
+
+// ---------------------------------------------------------------- Geometry helpers
+const HOLES = COURSE.holes;
+const dist2 = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+function seeded(seed) { let s = seed >>> 0 || 1; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
+function pointIn(p, poly) { let c = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const a = poly[i], b = poly[j]; if ((a[1] > p[1]) !== (b[1] > p[1]) && p[0] < (b[0] - a[0]) * (p[1] - a[1]) / (b[1] - a[1]) + a[0]) c = !c; } return c; }
+function centroid(r) { let x = 0, y = 0; for (const p of r) { x += p[0]; y += p[1]; } return [x / r.length, y / r.length]; }
+function edgeDist(p, r) { let m = Infinity; for (let i = 0, j = r.length - 1; i < r.length; j = i++) { const a = r[j], b = r[i], dx = b[0] - a[0], dy = b[1] - a[1], L2 = dx * dx + dy * dy || 1e-9; const u = Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L2)); m = Math.min(m, Math.hypot(p[0] - a[0] - u * dx, p[1] - a[1] - u * dy)); } return m; }
+function segDist(x, y, a, b) { const dx = b[0] - a[0], dy = b[1] - a[1], L2 = dx * dx + dy * dy || 1e-9; const u = Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / L2)); return Math.hypot(x - a[0] - u * dx, y - a[1] - u * dy); }
+
+// The diorama: the course plus a narrow apron, cut out of the landscape like a model
+const APRON = 22;
+const onIsland = (x, y) => pointIn([x, y], COURSE.boundary) || edgeDist([x, y], COURSE.boundary) < APRON;
+
+// Pins for a day: somewhere on each green, at least 4 m from the edge, on the flattest candidate (like a hole cutter)
+function pickPins(seed) {
+  const rnd = seeded(seed);
+  return HOLES.map(h => {
+    const g = F.green.find(gr => pointIn(h.pin, gr.o)) || F.green.reduce((b, gr) => dist2(centroid(gr.o), h.pin) < dist2(centroid(b.o), h.pin) ? gr : b);
+    let best = null;
+    for (let k = 0; k < 80; k++) {
+      const c = centroid(g.o), a = rnd() * Math.PI * 2, r = rnd() * 10;
+      const p = [c[0] + Math.cos(a) * r, c[1] + Math.sin(a) * r];
+      if (!pointIn(p, g.o) || edgeDist(p, g.o) < 4) continue;
+      const n = normalAt(p[0], p[1]), slope = Math.hypot(n.x, n.y) / n.z + rnd() * 0.004;
+      if (!best || slope < best.s) best = { p, s: slope };
+      if (k > 20 && best) break;
+    }
+    return best ? best.p : h.pin;
+  });
+}
+function windsFor(seed) {
+  const r = seeded(seed * 7 + 3);
+  // The afternoon breeze usually comes up the valley from the south-west; some days are calm
+  return HOLES.map(() => { const mph = Math.round(r() < 0.2 ? r() * 3 : 2 + r() * 11); const from = (200 + (r() - 0.5) * 120) * Math.PI / 180; return { mph, from }; });
+}
+// The day's challenge: one par 3, one par 4 and one par 5, picked by the date, played in course order
+function dailyHoles(day) {
+  const r = seeded(seedOf(day) * 31 + 17);
+  const pick = par => { const list = HOLES.map((h, i) => ({ h, i })).filter(o => o.h.par === par); return list[Math.floor(r() * list.length)].i; };
+  return [pick(3), pick(4), pick(5)].sort((a, b) => a - b);
+}
+
+// ---------------------------------------------------------------- Trees (lining the holes, on the island only)
+const trees = [];
+const treeGrid = new Map(), TG = 20;
+{
+  const rnd = seeded(91773);
+  const lines = HOLES.map(h => [h.tees.blue, ...h.line.slice(1)]);
+  const nearLine = (x, y, r) => lines.some(L => { for (let i = 0; i < L.length - 1; i++) if (segDist(x, y, L[i], L[i + 1]) < r) return true; return false; });
+  const clearOf = (x, y, r) => { for (let a = 0; a < 8; a++) { const s = surface(x + Math.cos(a * 0.785) * r, y + Math.sin(a * 0.785) * r); if (s !== S.ROUGH && s !== S.OB) return false; } return surface(x, y) === S.ROUGH || surface(x, y) === S.OB; };
+  for (let x = DEM.x0 + 8; x < DEM.x1 - 8; x += 7) for (let y = DEM.y0 + 8; y < DEM.y1 - 8; y += 7) {
+    const jx = x + (rnd() - 0.5) * 6, jy = y + (rnd() - 0.5) * 6;
+    const ins = pointIn([jx, jy], COURSE.boundary);
+    if (!ins && !(edgeDist([jx, jy], COURSE.boundary) < APRON - 4)) { rnd(); rnd(); rnd(); rnd(); continue; }
+    if (ins && nearLine(jx, jy, 20)) continue;
+    if (!clearOf(jx, jy, ins ? 7 : 3)) continue;
+    if (!ins && COURSE.buildings.some(b => pointIn([jx, jy], b.o))) continue;
+    if (!ins && COURSE.roads.some(rd => rd.p.some((q, i) => i && segDist(jx, jy, rd.p[i - 1], q) < rd.w * 0.7))) continue;
+    if (rnd() > (ins ? 0.5 : 0.35)) continue;
+    const kind = rnd() < 0.35 ? 'pine' : rnd() < 0.5 ? 'euc' : 'oak';
+    const hgt = kind === 'pine' ? 11 + rnd() * 9 : kind === 'euc' ? 14 + rnd() * 10 : 8 + rnd() * 6;
+    const rx = kind === 'pine' ? 2.6 + rnd() * 1.4 : kind === 'euc' ? 3 + rnd() * 1.6 : 4 + rnd() * 2.5;
+    const trunk = kind === 'pine' ? hgt * 0.3 : kind === 'euc' ? hgt * 0.45 : hgt * 0.35;
+    const base = height(jx, jy);
+    const t = { x: jx, y: jy, base, trunk, tr: 0.3, rx, rz: (hgt - trunk) / 2, cz: base + trunk + (hgt - trunk) / 2, dens: kind === 'pine' ? 0.35 : 0.28, kind, hgt, shade: rnd() };
+    trees.push(t);
+    const key = Math.floor(jx / TG) + ',' + Math.floor(jy / TG);
+    if (!treeGrid.has(key)) treeGrid.set(key, []);
+    treeGrid.get(key).push(t);
+  }
+}
+function treeAt(x, y) {
+  const gx = Math.floor(x / TG), gy = Math.floor(y / TG), out = [];
+  for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) { const a = treeGrid.get((gx + i) + ',' + (gy + j)); if (a) for (const t of a) if (Math.abs(t.x - x) < t.rx + 1 && Math.abs(t.y - y) < t.rx + 1) out.push(t); }
+  return out;
+}
+
+// ---------------------------------------------------------------- Clubs and player levels
+const CLUBS = [
+  { n: 'Driver', s: 'Driver', speed: 78.44, launch: 10.9, rpm: 2686 }, { n: '3 Wood', s: '3 Wood', speed: 70.56, launch: 9.2, rpm: 3655 },
+  { n: '5 Wood', s: '5 Wood', speed: 67.13, launch: 9.4, rpm: 4350 }, { n: 'Hybrid', s: 'Hybrid', speed: 65.64, launch: 10.2, rpm: 4437 },
+  { n: '4 Iron', s: '4 Iron', speed: 60.25, launch: 11.0, rpm: 4836 }, { n: '5 Iron', s: '5 Iron', speed: 58.09, launch: 12.1, rpm: 5361 },
+  { n: '6 Iron', s: '6 Iron', speed: 55.79, launch: 14.1, rpm: 6231 }, { n: '7 Iron', s: '7 Iron', speed: 53.72, launch: 16.3, rpm: 7097 },
+  { n: '8 Iron', s: '8 Iron', speed: 51.49, launch: 18.1, rpm: 7998 }, { n: '9 Iron', s: '9 Iron', speed: 48.98, launch: 20.4, rpm: 8647 },
+  { n: 'Pitching Wedge', s: 'P.Wedge', speed: 46.58, launch: 24.2, rpm: 9304 }, { n: 'Gap Wedge', s: 'G.Wedge', speed: 43.21, launch: 27.5, rpm: 9500 },
+  { n: 'Sand Wedge', s: 'S.Wedge', speed: 39.92, launch: 30, rpm: 10000 }, { n: 'Lob Wedge', s: 'L.Wedge', speed: 36.16, launch: 33, rpm: 10200 },
+  { n: 'Putter', s: 'Putt', putter: true },
+];
+const KEYED = [0, 1, 3, 5, 7, 9, 10, 12, 13, 14];        // number keys 1–9, 0
+const WEDGE = i => i >= 10 && i <= 13;
+const LEVELS = [
+  { k: 'tour', n: 'Tour pro', speed: 1.0, tilt: 1.0, sd: 0.01 }, { k: 'scratch', n: 'Scratch', speed: 0.93, tilt: 1.8, sd: 0.015 },
+  { k: 'hcp10', n: '10 handicap', speed: 0.85, tilt: 3.0, sd: 0.022 }, { k: 'hcp20', n: '20 handicap', speed: 0.78, tilt: 4.5, sd: 0.03 },
+];
+const TEES = [{ k: 'blue', n: 'Blue', c: '#2f63d6' }, { k: 'white', n: 'White', c: '#f4f4f4' }, { k: 'red', n: 'Red', c: '#e0413c' }];
+const SHAPES = ['Draw', 'Straight', 'Fade'], TRAJ = ['Low', 'Normal', 'High'];
+
+const flatWorld = s => ({ height: () => 0, normal: () => ({ x: 0, y: 0, z: 1 }), surface: x => x < 3 ? S.TEE : s, wind: { x: 0, y: 0 }, cup: null, rng: () => 0.5 });
+let carryTable = [];
+let puttTable = null;
+function buildPuttTable() {
+  puttTable = [[0, 0]];
+  const w = { height: () => 0, normal: () => ({ x: 0, y: 0, z: 1 }), surface: () => S.GREEN, wind: { x: 0, y: 0 }, cup: null, rng: () => 0.5 };
+  for (let v = 0.15; v <= 9.01; v += 0.15) puttTable.push([P.simulate(w, { x: 0, y: 0, z: P.R }, { speed: v, launch: 0, rpm: 0, dir: 0, putt: true }).end.x, v]);
+}
+function speedForPutt(d) {
+  for (let i = 1; i < puttTable.length; i++) { const [d1, v1] = puttTable[i], [d0, v0] = puttTable[i - 1]; if (d <= d1) return v0 + (v1 - v0) * (d - d0) / Math.max(1e-6, d1 - d0); }
+  return puttTable[puttTable.length - 1][1];
+}
+function buildCarryTable(level) {
+  carryTable = CLUBS.map(c => {
+    if (c.putter) return { carry: 0, total: 0 };
+    const r = P.simulate(flatWorld(S.FAIRWAY), { x: 0, y: 0, z: P.R }, { speed: c.speed * level.speed, launch: c.launch, rpm: c.rpm * (0.6 + 0.4 * level.speed), dir: 0 });
+    return { carry: r.firstLand.x, total: r.end.x };
+  });
+}
+
+// ---------------------------------------------------------------- Game state
+const TODAY = ptDay();
+const game = {
+  mode: 'round', day: TODAY, seq: [...HOLES.keys()], si: 0, scored: true,
+  tee: 'white', level: 2, hole: 0, scores: Array(18).fill(null), pins: pickPins(seedOf(TODAY)), winds: windsFor(seedOf(TODAY)),
+  ball: null, prev: null, strokes: 0, penalty: 0, club: 0, aim: 0, shape: 1, traj: 1, phase: 'menu', putScale: 30, lastShot: null,
+};
+const windVec = () => { const w = game.winds[game.hole]; const to = w.from + Math.PI; const sp = w.mph * MPH; return { x: Math.sin(to) * sp, y: Math.cos(to) * sp }; };
+const curHole = () => HOLES[game.hole];
+const pin = () => game.pins[game.hole];
+function world() { return { height, normal: normalAt, surface, wind: windVec(), cup: { x: pin()[0], y: pin()[1] }, trees, treeAt, rng: Math.random }; }
+
+// ---------------------------------------------------------------- Rendering
+const canvas = $('view');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.12;
+const scene = new THREE.Scene();
+const HAZE = new THREE.Color('#cdeceb');
+scene.fog = new THREE.Fog(HAZE, 700, 3200);
+const camera = new THREE.PerspectiveCamera(55, 1, 0.05, 7000);
+{
+  const geo = new THREE.SphereGeometry(5000, 32, 16);
+  const mat = new THREE.ShaderMaterial({
+    side: THREE.BackSide, depthWrite: false, fog: false,
+    uniforms: { top: { value: new THREE.Color('#5cb6e6') }, mid: { value: new THREE.Color('#a9dcef') }, hor: { value: HAZE }, low: { value: new THREE.Color('#8fcfd0') } },
+    vertexShader: 'varying vec3 vP; void main(){ vP = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
+    fragmentShader: 'uniform vec3 top; uniform vec3 mid; uniform vec3 hor; uniform vec3 low; varying vec3 vP; void main(){ float h = vP.y; vec3 c = h < 0.0 ? mix(hor, low, smoothstep(0.0, -0.4, h)) : mix(mix(hor, mid, smoothstep(0.0, 0.14, h)), top, smoothstep(0.14, 0.75, h)); gl_FragColor = vec4(c, 1.0); }',
+  });
+  const sky = new THREE.Mesh(geo, mat); sky.frustumCulled = false; sky.renderOrder = -1; scene.add(sky);
+  game.sky = sky;
+}
+const hemi = new THREE.HemisphereLight('#ffffff', '#5f8a55', 1.25); scene.add(hemi);
+const sun = new THREE.DirectionalLight('#fff1dc', 2.0);
+const SUN_DIR = new THREE.Vector3(-0.45, 0.8, 0.4).normalize();
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -140, right: 140, top: 140, bottom: -140, near: 10, far: 900 });
+sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.6;
+scene.add(sun, sun.target);
+
+// Course texture: flat, bright, model-railway colours painted from the same features as the lie map
+const TPM = 2;
+const COL = {
+  apron: '#5d8f45', lot: '#78a557', road: '#6c7174', roadEdge: '#9aa09a', rough: '#4f9a3f', range: '#6fb04d',
+  fairway: '#7fce55', stripe: 'rgba(255,255,230,0.10)', tee: '#8bd55e', fringe: '#86cb5b', green: '#a1e36b',
+  sand: '#f4dea3', sandRim: 'rgba(170,130,70,0.45)', water: '#44bfd5', waterEdge: '#a8e7ea', path: '#e6dfcd',
+};
+function paintCourse() {
+  const W = Math.ceil((DEM.x1 - DEM.x0) * TPM), H = Math.ceil((DEM.y1 - DEM.y0) * TPM);
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+  const g = cv.getContext('2d');
+  g.setTransform(TPM, 0, 0, -TPM, -DEM.x0 * TPM, DEM.y1 * TPM);
+  const path = (rings) => { const p = new Path2D(); for (const r of rings) { p.moveTo(r[0][0], r[0][1]); for (let i = 1; i < r.length; i++) p.lineTo(r[i][0], r[i][1]); p.closePath(); } return p; };
+  const line = pts => { const p = new Path2D(); p.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) p.lineTo(pts[i][0], pts[i][1]); return p; };
+  g.fillStyle = COL.apron; g.fillRect(DEM.x0, DEM.y0, DEM.x1 - DEM.x0, DEM.y1 - DEM.y0);
+  for (const b of COURSE.buildings) { g.fillStyle = COL.lot; g.beginPath(); const c = centroid(b.o); g.arc(c[0], c[1], 13, 0, 7); g.fill(); }
+  g.lineCap = 'round'; g.lineJoin = 'round';
+  for (const r of COURSE.roads) { g.strokeStyle = COL.roadEdge; g.lineWidth = r.w + 2.5; g.stroke(line(r.p)); }
+  for (const r of COURSE.roads) { g.strokeStyle = COL.road; g.lineWidth = r.w; g.stroke(line(r.p)); }
+  g.fillStyle = COL.rough; g.fill(path([COURSE.boundary]));
+  for (const f of (F.driving_range || [])) { g.fillStyle = COL.range; g.fill(path(ringsOf(f)), 'evenodd'); }
+  const holeDir = (c) => { let best = null, bd = Infinity; for (const h of HOLES) { const L = [h.tees.blue, ...h.line.slice(1)]; for (let i = 0; i < L.length - 1; i++) { const d = segDist(c[0], c[1], L[i], L[i + 1]); if (d < bd) { bd = d; best = Math.atan2(L[i + 1][1] - L[i][1], L[i + 1][0] - L[i][0]); } } } return best || 0; };
+  const stripes = (rings, base, light, width) => {
+    const p = path(rings); g.fillStyle = base; g.fill(p, 'evenodd');
+    g.save(); g.clip(p, 'evenodd');
+    const c = centroid(rings[0]), a = holeDir(c), ux = Math.cos(a), uy = Math.sin(a);
+    g.fillStyle = light;
+    for (let k = -40; k < 40; k += 2) {
+      const cx = c[0] + ux * k * width, cy = c[1] + uy * k * width;
+      g.beginPath();
+      g.moveTo(cx - uy * 300, cy + ux * 300); g.lineTo(cx - uy * 300 + ux * width, cy + ux * 300 + uy * width);
+      g.lineTo(cx + uy * 300 + ux * width, cy - ux * 300 + uy * width); g.lineTo(cx + uy * 300, cy - ux * 300); g.closePath(); g.fill();
+    }
+    g.restore();
+  };
+  for (const f of F.fairway) stripes(ringsOf(f), COL.fairway, COL.stripe, 10);
+  for (const f of F.tee) stripes(ringsOf(f), COL.tee, COL.stripe, 3);
+  for (const h of HOLES) for (const p of Object.values(h.tees)) stripes([teePad(p)], COL.tee, COL.stripe, 3);
+  for (const f of F.green) { g.strokeStyle = COL.fringe; g.lineWidth = 3; g.stroke(path([f.o])); }
+  for (const f of F.green) stripes(ringsOf(f), COL.green, 'rgba(255,255,230,0.08)', 2.4);
+  for (const f of F.bunker) { const p = path(ringsOf(f)); g.fillStyle = COL.sand; g.fill(p, 'evenodd'); g.strokeStyle = COL.sandRim; g.lineWidth = 0.9; g.stroke(p); }
+  for (const f of F.water) {
+    const p = path(ringsOf(f));
+    g.strokeStyle = COL.waterEdge; g.lineWidth = 2.2; g.stroke(p);
+    g.fillStyle = COL.water; g.fill(p, 'evenodd');
+  }
+  for (const L of F.cartpath) { g.strokeStyle = COL.path; g.lineWidth = 2.3; g.stroke(line(L)); }
+  return cv;
+}
+
+// Terrain on the island only, with rock-and-soil walls down the cut edge
+function buildTerrain() {
+  const tex = new THREE.CanvasTexture(paintCourse());
+  tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  const { nx, ny, step } = DEM;
+  const keep = new Uint8Array(nx * ny);
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) keep[j * nx + i] = onIsland(DEM.x0 + i * step, DEM.y0 + j * step) ? 1 : 0;
+  const quad = (i, j) => i >= 0 && j >= 0 && i < nx - 1 && j < ny - 1 && keep[j * nx + i] && keep[j * nx + i + 1] && keep[(j + 1) * nx + i] && keep[(j + 1) * nx + i + 1];
+  const pos = new Float32Array(nx * ny * 3), uv = new Float32Array(nx * ny * 2);
+  let zLow = Infinity;
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+    const k = j * nx + i;
+    pos[k * 3] = DEM.x0 + i * step; pos[k * 3 + 1] = DEM.z[k] - Z0; pos[k * 3 + 2] = -(DEM.y0 + j * step);
+    uv[k * 2] = i / (nx - 1); uv[k * 2 + 1] = j / (ny - 1);
+    if (keep[k]) zLow = Math.min(zLow, DEM.z[k]);
+  }
+  const idx = [];
+  for (let j = 0; j < ny - 1; j++) for (let i = 0; i < nx - 1; i++) if (quad(i, j)) { const a = j * nx + i, b = a + 1, c = a + nx, d = c + 1; idx.push(a, b, c, b, d, c); }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  geo.setIndex(idx); geo.computeVertexNormals();
+  const mesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ map: tex, flatShading: true }));
+  mesh.receiveShadow = true; scene.add(mesh);
+  // Walls: every outside edge of the kept quads drops to a flat base, banded like a cut bank
+  const base = zLow - 28 - Z0, wp = [], wc = [];
+  const bands = [[0, '#4d8a3a'], [1.2, '#7a5a3e'], [6, '#94795c'], [18, '#a38d71'], [40, '#8c7761'], [80, '#6f5e4f']];
+  const colAt = depth => { let c = bands[0][1]; for (const [d, cc] of bands) if (depth >= d) c = cc; return new THREE.Color(c); };
+  const wall = (k1, k2) => {
+    const x1 = pos[k1 * 3], y1 = pos[k1 * 3 + 1], z1 = pos[k1 * 3 + 2], x2 = pos[k2 * 3], y2 = pos[k2 * 3 + 1], z2 = pos[k2 * 3 + 2];
+    // Split the wall into horizontal bands so the strata read as layers
+    const cuts = [0, 1.2, 6, 18, 40, 80, 1e9];
+    for (let b = 0; b < cuts.length - 1; b++) {
+      const t1 = Math.min(y1 - base, cuts[b]), t2 = Math.min(y2 - base, cuts[b]), u1 = Math.min(y1 - base, cuts[b + 1]), u2 = Math.min(y2 - base, cuts[b + 1]);
+      if (t1 >= y1 - base && t2 >= y2 - base) break;
+      const a1 = y1 - t1, a2 = y2 - t2, b1 = Math.max(base, y1 - u1), b2 = Math.max(base, y2 - u2);
+      const c = colAt(cuts[b]);
+      wp.push(x1, a1, z1, x2, a2, z2, x2, b2, z2, x1, a1, z1, x2, b2, z2, x1, b1, z1);
+      for (let q = 0; q < 6; q++) wc.push(c.r, c.g, c.b);
+    }
+  };
+  for (let j = 0; j < ny - 1; j++) for (let i = 0; i < nx - 1; i++) {
+    if (!quad(i, j)) continue;
+    const a = j * nx + i, b = a + 1, c = a + nx, d = c + 1;
+    if (!quad(i, j - 1)) wall(a, b);
+    if (!quad(i + 1, j)) wall(b, d);
+    if (!quad(i, j + 1)) wall(d, c);
+    if (!quad(i - 1, j)) wall(c, a);
+  }
+  const wgeo = new THREE.BufferGeometry();
+  wgeo.setAttribute('position', new THREE.Float32BufferAttribute(wp, 3)); wgeo.setAttribute('color', new THREE.Float32BufferAttribute(wc, 3));
+  wgeo.computeVertexNormals();
+  scene.add(new THREE.Mesh(wgeo, new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide, flatShading: true })));
+  // A soft floor far below reads as haze over the valley
+  const floor = new THREE.Mesh(new THREE.CircleGeometry(6000, 48).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: '#9ed6d4' }));
+  floor.position.y = base - 160; scene.add(floor);
+}
+
+function buildTrees() {
+  const kinds = { pine: [], euc: [], oak: [] };
+  for (const t of trees) kinds[t.kind].push(t);
+  const trunkGeo = new THREE.CylinderGeometry(0.22, 0.35, 1, 6); trunkGeo.translate(0, 0.5, 0);
+  const trunks = new THREE.InstancedMesh(trunkGeo, new THREE.MeshLambertMaterial({ color: '#7a5a3f' }), Math.max(1, trees.length));
+  trunks.castShadow = true;
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3();
+  trees.forEach((t, i) => { m.compose(toV(t.x, t.y, t.base - 0.3), q, s.set(t.kind === 'oak' ? 1.4 : 1, t.trunk + 0.6, t.kind === 'oak' ? 1.4 : 1)); trunks.setMatrixAt(i, m); });
+  trunks.count = trees.length; scene.add(trunks);
+  const canopy = (list, geo, colors) => {
+    if (!list.length) return;
+    const mesh = new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial({ flatShading: true }), list.length);
+    mesh.castShadow = true;
+    const col = new THREE.Color();
+    list.forEach((t, i) => {
+      q.setFromEuler(new THREE.Euler(0, t.shade * 6.28, 0));
+      m.compose(toV(t.x, t.y, t.cz), q, s.set(t.rx, t.rz, t.rx)); mesh.setMatrixAt(i, m);
+      col.set(colors[0]).lerp(new THREE.Color(colors[1]), t.shade); mesh.setColorAt(i, col);
+    });
+    scene.add(mesh);
+  };
+  canopy(kinds.pine, new THREE.ConeGeometry(1, 2, 7), ['#2e6f3c', '#3f8a4a']);
+  canopy(kinds.euc, new THREE.IcosahedronGeometry(1, 0), ['#6a9e6c', '#8db67f']);
+  canopy(kinds.oak, new THREE.IcosahedronGeometry(1, 0), ['#4c9a39', '#6fb54c']);
+}
+
+function buildBuildings() {
+  const pos = [], nor = [], col = [];
+  const stucco = ['#f1e7d3', '#ece0c6', '#f5eee0', '#e8dcc4'], roofs = ['#d07a52', '#c56b47', '#b9785b', '#d58a5c'];
+  const rnd = seeded(12);
+  const push = (a, b, c, n, cc) => { for (const p of [a, b, c]) { pos.push(p.x, p.y, p.z); nor.push(n.x, n.y, n.z); col.push(cc.r, cc.g, cc.b); } };
+  for (const b of COURSE.buildings) {
+    const pts = b.o.slice(0, b.o[0][0] === b.o[b.o.length - 1][0] && b.o[0][1] === b.o[b.o.length - 1][1] ? -1 : undefined);
+    if (pts.length < 3 || !pts.every(p => onIsland(p[0], p[1]))) continue;
+    let zb = Infinity; for (const p of pts) zb = Math.min(zb, height(p[0], p[1]));
+    const h = Math.min(12, b.h || 4.5), wall = new THREE.Color(stucco[(rnd() * stucco.length) | 0]), roof = new THREE.Color(roofs[(rnd() * roofs.length) | 0]);
+    for (let i = 0; i < pts.length; i++) {
+      const a = pts[i], c = pts[(i + 1) % pts.length];
+      const A = toV(a[0], a[1], zb - 0.5), B = toV(c[0], c[1], zb - 0.5), C = toV(c[0], c[1], zb + h), D = toV(a[0], a[1], zb + h);
+      const n = new THREE.Vector3().subVectors(B, A).cross(new THREE.Vector3().subVectors(D, A)).normalize();
+      push(A, B, C, n, wall); push(A, C, D, n, wall);
+    }
+    const tri = THREE.ShapeUtils.triangulateShape(pts.map(p => new THREE.Vector2(p[0], p[1])), []);
+    for (const [i0, i1, i2] of tri) {
+      const A = toV(pts[i0][0], pts[i0][1], zb + h), B = toV(pts[i1][0], pts[i1][1], zb + h), C = toV(pts[i2][0], pts[i2][1], zb + h);
+      const n = new THREE.Vector3().subVectors(B, A).cross(new THREE.Vector3().subVectors(C, A));
+      if (n.y < 0) push(A, C, B, new THREE.Vector3(0, 1, 0), roof); else push(A, B, C, new THREE.Vector3(0, 1, 0), roof);
+    }
+  }
+  if (!pos.length) return;
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  const mesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }));
+  mesh.castShadow = true; mesh.receiveShadow = true; scene.add(mesh);
+}
+
+// Ball, flag, tee markers, aim marker, tracer, green-reading arrows
+const ballMesh = new THREE.Mesh(new THREE.SphereGeometry(P.R, 16, 12), new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.35 }));
+ballMesh.castShadow = true; scene.add(ballMesh);
+const flag = new THREE.Group();
+{
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 2.3, 6).translate(0, 1.15, 0), new THREE.MeshLambertMaterial({ color: '#fbf8ef' }));
+  const cloth = new THREE.Mesh(new THREE.PlaneGeometry(0.58, 0.38, 8, 2).translate(0.29, 2.1, 0), new THREE.MeshLambertMaterial({ color: '#f0643c', side: THREE.DoubleSide }));
+  const cup = new THREE.Mesh(new THREE.CircleGeometry(P.CUP_R, 20).rotateX(-Math.PI / 2).translate(0, 0.004, 0), new THREE.MeshBasicMaterial({ color: '#16211b' }));
+  pole.castShadow = true; cloth.castShadow = true;
+  flag.add(pole, cloth, cup); flag.userData.cloth = cloth; scene.add(flag);
+}
+const teeMarkers = new THREE.Group(); scene.add(teeMarkers);
+const aimRing = new THREE.Mesh(new THREE.RingGeometry(2.2, 2.8, 40).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.85, depthWrite: false }));
+aimRing.renderOrder = 2; scene.add(aimRing);
+const aimLine = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineDashedMaterial({ color: '#ffffff', dashSize: 1.5, gapSize: 1.2, transparent: true, opacity: 0.75 }));
+scene.add(aimLine);
+const tracer = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.9 }));
+tracer.frustumCulled = false; scene.add(tracer);
+const arrows = new THREE.InstancedMesh(new THREE.ConeGeometry(0.07, 0.3, 5).rotateZ(-Math.PI / 2), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.85 }), 900);
+arrows.count = 0; arrows.frustumCulled = false; scene.add(arrows);
+
+// ---------------------------------------------------------------- Sound (synthesised; starts after the first tap)
+let actx = null;
+function audio() { if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch { actx = null; } } return actx; }
+function noise(dur, freq, q, vol, type = 'bandpass') {
+  const a = audio(); if (!a || game.mute) return;
+  const len = Math.floor(a.sampleRate * dur), buf = a.createBuffer(1, len, a.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3);
+  const src = a.createBufferSource(); src.buffer = buf;
+  const f = a.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q;
+  const gn = a.createGain(); gn.gain.value = vol; src.connect(f).connect(gn).connect(a.destination); src.start();
+}
+const sfx = {
+  strike: (putt) => putt ? noise(0.06, 1800, 3, 0.35) : noise(0.12, 2600, 1.2, 0.9),
+  land: () => noise(0.1, 300, 1, 0.35, 'lowpass'),
+  cup: () => { noise(0.08, 900, 6, 0.5); setTimeout(() => noise(0.1, 600, 5, 0.4), 90); },
+  splash: () => noise(0.5, 1200, 0.6, 0.6),
+  tree: () => noise(0.25, 3500, 0.8, 0.35),
+};
+
+// ---------------------------------------------------------------- HUD
+function toast(text, ms = 2600) { const t = $('toast'); t.textContent = text; t.classList.add('show'); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('show'), ms); }
+const yds = m => Math.round(m / YD);
+const fmtRel = n => n === 0 ? 'E' : n > 0 ? '+' + n : String(n);
+const relClass = n => n < 0 ? 'under' : n === 0 ? 'even' : 'over';
+function totalVsPar() { let s = 0, p = 0; for (const i of game.seq) if (game.scores[i] != null) { s += game.scores[i]; p += HOLES[i].par; } return s - p; }
+function lieEffect(sc, clubIdx) {
+  if (sc === S.ROUGH || sc === S.OB) return { speed: 0.93, rpm: 0.6, launch: 1, tilt: 1.4 };
+  if (sc === S.NATIVE) return { speed: 0.82, rpm: 0.5, launch: 2, tilt: 2 };
+  if (sc === S.BUNKER) return WEDGE(clubIdx) ? { speed: 0.82, rpm: 0.7, launch: 4, tilt: 1.5 } : { speed: 0.6, rpm: 0.5, launch: 2, tilt: 2.5 };
+  if (sc === S.FRINGE) return { speed: 0.98, rpm: 0.9, launch: 0, tilt: 1 };
+  return { speed: 1, rpm: 1, launch: 0, tilt: 1 };
+}
+function updateHud() {
+  const h = curHole(), b = game.ball;
+  $('hT1').textContent = `Hole ${game.si + 1}/${game.seq.length} · Par ${h.par}`;
+  $('hT2').textContent = `Stroke ${game.strokes + game.penalty + 1} · ${fmtRel(totalVsPar())}`;
+  $('hT3').textContent = `San Dimas #${h.n} · ${h.yards[game.tee]} yd ${TEES.find(t => t.k === game.tee).n}`;
+  const pp = pin(), dm = dist2([b.x, b.y], pp), sc = surface(b.x, b.y), onGreen = sc === S.GREEN;
+  $('dBig').innerHTML = onGreen ? `${Math.round(dm / FT)}<small>ft</small>` : `${yds(dm)}<small>yd</small>`;
+  $('dLie').textContent = game.strokes + game.penalty === 0 ? 'Tee' : P.SURF[sc].name;
+  $('dLast').textContent = game.lastShot ? `last shot ${game.lastShot}` : 'last shot —';
+  const elev = Math.round((height(pp[0], pp[1]) - b.z) / FT);
+  $('elev').textContent = elev === 0 ? 'level' : `${elev > 0 ? '▲' : '▼'}${Math.abs(elev)} ft`;
+  const w = game.winds[game.hole], toDir = w.from + Math.PI, aimBearing = Math.PI / 2 - game.aim;
+  $('windArrow').style.transform = `rotate(${((toDir - aimBearing) * 180 / Math.PI).toFixed(1)}deg)`;
+  $('windMph').textContent = w.mph;
+  $('shapeV').textContent = SHAPES[game.shape];
+  $('trajV').textContent = TRAJ[game.traj];
+  renderClubBar();
+}
+function renderClubBar() {
+  const bar = $('clubBar'), b = game.ball;
+  if (!bar.childElementCount) {
+    CLUBS.forEach((c, i) => {
+      const k = KEYED.indexOf(i);
+      const el = document.createElement('button'); el.className = 'club'; el.dataset.i = i;
+      el.innerHTML = `<span class="k">${k >= 0 ? (k + 1) % 10 : '&nbsp;'}</span><span class="n"></span><span class="y num"></span>`;
+      el.querySelector('.n').textContent = c.s;
+      el.onclick = () => selectClub(i);
+      bar.appendChild(el);
+    });
+  }
+  const lf = b ? lieEffect(surface(b.x, b.y), game.club) : { speed: 1 };
+  [...bar.children].forEach((el, i) => {
+    const c = CLUBS[i];
+    el.setAttribute('aria-pressed', String(i === game.club));
+    el.querySelector('.y').textContent = c.putter ? `${game.putScale} ft` : `${yds(carryTable[i].carry * lf.speed)} yd`;
+  });
+  const sel = bar.children[game.club];
+  if (sel && renderClubBar.last !== game.club && bar.scrollWidth > bar.clientWidth) bar.scrollTo({ left: sel.offsetLeft - bar.clientWidth / 2 + sel.offsetWidth / 2, behavior: 'smooth' });
+  renderClubBar.last = game.club;
+}
+
+// ---------------------------------------------------------------- Aiming and club choice
+function holePathPoints() { const h = curHole(); return [[game.ball.x, game.ball.y], ...h.line.slice(1, -1).filter(v => dist2(v, pin()) < dist2([game.ball.x, game.ball.y], pin()) - 5), pin()]; }
+function defaultAim() {
+  const b = [game.ball.x, game.ball.y], pp = pin(), c = CLUBS[game.club];
+  if (c.putter) return Math.atan2(pp[1] - b[1], pp[0] - b[0]);
+  const reach = carryTable[game.club].total * 1.05;
+  if (dist2(b, pp) <= reach) return Math.atan2(pp[1] - b[1], pp[0] - b[0]);
+  const L = holePathPoints(), corner = L[1];
+  if (dist2(b, corner) <= reach) return Math.atan2(corner[1] - b[1], corner[0] - b[0]);
+  const t = reach / dist2(b, corner), p = [b[0] + (corner[0] - b[0]) * t, b[1] + (corner[1] - b[1]) * t];
+  return Math.atan2(p[1] - b[1], p[0] - b[0]);
+}
+function autoClub() {
+  const b = [game.ball.x, game.ball.y], sc = surface(b[0], b[1]), dm = dist2(b, pin());
+  if (sc === S.GREEN || (sc === S.FRINGE && dm < 12)) return CLUBS.length - 1;
+  const lf = lieEffect(sc, 0).speed;
+  const onTee = game.strokes + game.penalty === 0;
+  const L = holePathPoints(); let layup = Infinity;
+  if (L.length > 2) {
+    const a1 = Math.atan2(L[1][1] - b[1], L[1][0] - b[0]), a2 = Math.atan2(L[2][1] - L[1][1], L[2][0] - L[1][0]);
+    const turn = Math.abs(Math.atan2(Math.sin(a2 - a1), Math.cos(a2 - a1)));
+    if (turn > 0.35) layup = dist2(b, L[1]) + 18;
+  }
+  for (let i = onTee ? 0 : 1; i < CLUBS.length - 1; i++) {
+    const t = carryTable[i];
+    if (t.total * lf > layup + 8) continue;
+    if (onTee && curHole().par >= 4 && t.total * lf <= Math.min(layup, dm) + 20) return i;
+    if (t.carry * lf <= dm + 3) return i;
+  }
+  return CLUBS.length - 2;
+}
+function setPutScale() {
+  const ft = dist2([game.ball.x, game.ball.y], pin()) / FT;
+  game.putScale = [10, 20, 35, 60, 100].find(s => s >= ft * 1.25) || 100;
+}
+function updateAimVisuals() {
+  const b = game.ball, c = CLUBS[game.club];
+  const lf = lieEffect(surface(b.x, b.y), game.club);
+  const dist = c.putter ? Math.min(dist2([b.x, b.y], pin()) + 1, game.putScale * FT) : carryTable[game.club].carry * lf.speed;
+  const x = b.x + Math.cos(game.aim) * dist, y = b.y + Math.sin(game.aim) * dist;
+  aimRing.position.copy(toV(x, y, height(x, y) + 0.08));
+  aimRing.scale.setScalar(Math.max(1, dist / 70));
+  aimRing.visible = !c.putter && game.phase === 'address';
+  const pts = [];
+  const n = c.putter ? 40 : 30;
+  for (let i = 1; i <= n; i++) { const t = i / n, px = b.x + Math.cos(game.aim) * dist * t, py = b.y + Math.sin(game.aim) * dist * t; pts.push(toV(px, py, height(px, py) + (c.putter ? 0.03 : 0.25))); }
+  aimLine.geometry.dispose(); aimLine.geometry = new THREE.BufferGeometry().setFromPoints(pts); aimLine.computeLineDistances();
+  aimLine.visible = game.phase === 'address';
+  drawMinimap();
+}
+function greenArrows(show) {
+  arrows.count = 0;
+  if (!show) return;
+  const b = game.ball, pp = pin(), m = new THREE.Matrix4(), q = new THREE.Quaternion(), col = new THREE.Color();
+  const cx = (b.x + pp[0]) / 2, cy = (b.y + pp[1]) / 2, rad = Math.max(6, dist2([b.x, b.y], pp) / 2 + 4);
+  let k = 0;
+  for (let x = cx - rad; x <= cx + rad && k < 900; x += 1.2) for (let y = cy - rad; y <= cy + rad && k < 900; y += 1.2) {
+    if (Math.hypot(x - cx, y - cy) > rad || surface(x, y) !== S.GREEN) continue;
+    const n = normalAt(x, y), slope = Math.hypot(n.x, n.y) / n.z;
+    q.setFromEuler(new THREE.Euler(0, Math.atan2(n.y, n.x), 0));
+    const s = 0.6 + Math.min(1.6, slope * 40);
+    m.compose(toV(x, y, height(x, y) + 0.05), q, new THREE.Vector3(s, 1, 1));
+    arrows.setMatrixAt(k, m);
+    col.set(slope < 0.015 ? '#bff0ff' : slope < 0.03 ? '#fff38a' : '#ff9a6a'); arrows.setColorAt(k, col);
+    k++;
+  }
+  arrows.count = k; arrows.instanceMatrix.needsUpdate = true; if (arrows.instanceColor) arrows.instanceColor.needsUpdate = true;
+}
+
+// ---------------------------------------------------------------- Hole maps (minimap and the lobby's challenge art)
+function rotP(p, r) { return [p[0] * Math.cos(r) - p[1] * Math.sin(r), p[0] * Math.sin(r) + p[1] * Math.cos(r)]; }
+function holeFrame(hi, tee, pinP, w, h, pad = 40) {
+  const H = HOLES[hi], T = H.tees[tee];
+  const ang = Math.atan2(pinP[1] - T[1], pinP[0] - T[0]), rot = Math.PI / 2 - ang;
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+  for (const p of [T, ...H.line, pinP].map(q => rotP(q, rot))) { x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]); }
+  x0 -= pad; x1 += pad; y0 -= pad; y1 += pad;
+  const sc = Math.min(w / (x1 - x0), h / (y1 - y0));
+  return { rot, sc, x0, y1, ox: (w - (x1 - x0) * sc) / 2, oy: (h - (y1 - y0) * sc) / 2 };
+}
+const mapPt = (T, p) => { const q = rotP(p, T.rot); return [T.ox + (q[0] - T.x0) * T.sc, T.oy + (T.y1 - q[1]) * T.sc]; };
+function drawHole(g, T, w, h, pinP, bg) {
+  g.fillStyle = bg; g.fillRect(0, 0, w, h);
+  const poly = (r, fill) => { g.beginPath(); r.forEach((p, i) => { const q = mapPt(T, p); i ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1]); }); g.closePath(); g.fillStyle = fill; g.fill(); };
+  poly(COURSE.boundary, COL.rough);
+  for (const f of F.fairway) poly(f.o, COL.fairway);
+  for (const f of F.tee) poly(f.o, COL.tee);
+  for (const f of F.green) poly(f.o, COL.green);
+  for (const f of F.bunker) poly(f.o, COL.sand);
+  for (const f of F.water) poly(f.o, COL.water);
+  g.fillStyle = 'rgba(28,70,36,0.85)';
+  for (const t of trees) { const q = mapPt(T, [t.x, t.y]); if (q[0] < -8 || q[1] < -8 || q[0] > w + 8 || q[1] > h + 8) continue; g.beginPath(); g.arc(q[0], q[1], Math.max(1.3, t.rx * T.sc * 0.8), 0, 7); g.fill(); }
+  const pp = mapPt(T, pinP); g.fillStyle = '#f0643c'; g.beginPath(); g.arc(pp[0], pp[1], Math.max(3, w / 75), 0, 7); g.fill();
+}
+const mm = $('minimap'), mg = mm.getContext('2d');
+let mmT = null;
+function minimapTransform() { mmT = holeFrame(game.hole, game.tee, pin(), mm.width, mm.height); }
+function fromMap(mx, my) { const qx = (mx - mmT.ox) / mmT.sc + mmT.x0, qy = mmT.y1 - (my - mmT.oy) / mmT.sc; return rotP([qx, qy], -mmT.rot); }
+function drawMinimap() {
+  if (!mmT || $('mapBox').hidden) return;
+  mg.setTransform(1, 0, 0, 1, 0, 0);
+  drawHole(mg, mmT, mm.width, mm.height, pin(), '#35573f');
+  if (game.ball) {
+    const b = [game.ball.x, game.ball.y], bq = mapPt(mmT, b), c = CLUBS[game.club];
+    const lf = lieEffect(surface(b[0], b[1]), game.club);
+    const d = c.putter ? dist2(b, pin()) : carryTable[game.club].carry * lf.speed;
+    const t = mapPt(mmT, [b[0] + Math.cos(game.aim) * d, b[1] + Math.sin(game.aim) * d]);
+    mg.strokeStyle = '#ffffff'; mg.lineWidth = 2; mg.setLineDash([5, 4]); mg.beginPath(); mg.moveTo(bq[0], bq[1]); mg.lineTo(t[0], t[1]); mg.stroke(); mg.setLineDash([]);
+    mg.beginPath(); mg.arc(t[0], t[1], 6, 0, 7); mg.stroke();
+    mg.fillStyle = '#fff'; mg.beginPath(); mg.arc(bq[0], bq[1], 4, 0, 7); mg.fill(); mg.strokeStyle = '#000'; mg.lineWidth = 1; mg.stroke();
+  }
+}
+mm.addEventListener('pointerdown', e => {
+  if (game.phase !== 'address') return;
+  const r = mm.getBoundingClientRect(), p = fromMap((e.clientX - r.left) * mm.width / r.width, (e.clientY - r.top) * mm.height / r.height);
+  game.aim = Math.atan2(p[1] - game.ball.y, p[0] - game.ball.x);
+  updateAimVisuals(); updateHud();
+});
+
+// ---------------------------------------------------------------- Hole flow
+function placeTeeMarkers() {
+  teeMarkers.clear();
+  const T = curHole().tees[game.tee], pp = pin(), a = Math.atan2(pp[1] - T[1], pp[0] - T[0]);
+  const col = TEES.find(t => t.k === game.tee).c;
+  for (const s of [-1, 1]) {
+    const x = T[0] + Math.cos(a + Math.PI / 2) * 2.5 * s, y = T[1] + Math.sin(a + Math.PI / 2) * 2.5 * s;
+    const mk = new THREE.Mesh(new THREE.SphereGeometry(0.1, 12, 8), new THREE.MeshLambertMaterial({ color: col }));
+    mk.position.copy(toV(x, y, height(x, y) + 0.09)); mk.castShadow = true; teeMarkers.add(mk);
+  }
+}
+function startHole(si, intro = true) {
+  game.si = si; game.hole = game.seq[si]; game.strokes = 0; game.penalty = 0; game.shape = 1; game.traj = 1; game.lastShot = null;
+  const T = curHole().tees[game.tee];
+  game.ball = { x: T[0], y: T[1], z: height(T[0], T[1]) + P.R };
+  game.prev = { ...game.ball };
+  const pp = pin(); flag.position.copy(toV(pp[0], pp[1], height(pp[0], pp[1])));
+  placeTeeMarkers(); minimapTransform();
+  newAddress();
+  saveRound();
+  if (intro && !matchMedia('(prefers-reduced-motion: reduce)').matches) flyover(); else { game.phase = 'address'; addressCamera(true); }
+}
+// Caddie for long shots: the longest club with a safe line that finishes in the fairway, even over a corner of OB
+function caddie() {
+  const b = game.ball, pp = pin(), dm = dist2([b.x, b.y], pp), sc = surface(b.x, b.y);
+  if (sc === S.GREEN || CLUBS[autoClub()].putter) return null;
+  const onTee = game.strokes + game.penalty === 0;
+  if (dm < 170 || (!onTee && sc !== S.FAIRWAY && sc !== S.ROUGH)) return null;
+  const lv = LEVELS[game.level], lf = lieEffect(sc, 0), w = { ...world(), rng: () => 1, treeAt: () => [] };
+  const toPin = Math.atan2(pp[1] - b.y, pp[0] - b.x), corner = defaultAim();
+  const span = Math.atan2(Math.sin(toPin - corner), Math.cos(toPin - corner));
+  const good = s => s === S.FAIRWAY || s === S.GREEN || s === S.FRINGE;
+  const STEP = 2 * Math.PI / 180, lo = Math.min(0, span) - 12 * Math.PI / 180, hi = Math.max(0, span) + 12 * Math.PI / 180;
+  for (let i = onTee ? 0 : 1; i <= 3; i++) {
+    const c = CLUBS[i], row = [];
+    for (let off = lo; off <= hi + 1e-9; off += STEP) {
+      const dir = corner + off;
+      const r = P.simulate(w, { x: b.x, y: b.y, z: b.z + 0.005 }, { speed: c.speed * lv.speed * lf.speed, launch: c.launch, rpm: c.rpm * lf.rpm * (0.6 + 0.4 * lv.speed), dir, tilt: 0 });
+      row.push({ dir, ok: r.result === 'rest' && good(r.surface), gain: dm - dist2([r.end.x, r.end.y], pp) });
+    }
+    let best = null;
+    for (let k = 1; k < row.length - 1; k++) if (row[k].ok && row[k - 1].ok && row[k + 1].ok && (!best || row[k].gain > best.gain)) best = { club: i, dir: row[k].dir, gain: row[k].gain };
+    if (best) return best;
+  }
+  return null;
+}
+function newAddress() {
+  game.club = autoClub();
+  if (CLUBS[game.club].putter) setPutScale();
+  game.aim = defaultAim();
+  const cad = caddie();
+  if (cad && carryTable[cad.club].total >= carryTable[game.club].total) { game.club = cad.club; game.aim = cad.dir; }
+  game.phase = 'address';
+  ballMesh.position.copy(toV(game.ball.x, game.ball.y, game.ball.z));
+  tracer.visible = false;
+  greenArrows(CLUBS[game.club].putter);
+  setPower(0);
+  updateHud(); updateAimVisuals();
+}
+function selectClub(i) {
+  if (game.phase !== 'address') return;
+  game.club = i; if (CLUBS[i].putter) setPutScale();
+  greenArrows(CLUBS[i].putter); updateHud(); updateAimVisuals();
+}
+function saveRound() {
+  if (game.mode === 'daily') store.set('daily:' + game.day, { scores: game.scores, si: game.si, done: false });
+  else if (game.mode === 'round') store.set('round', { tee: game.tee, level: game.level, si: game.si, scores: game.scores });
+}
+
+// ---------------------------------------------------------------- Swing
+function gauss() { let u = 0, v = 0; while (!u) u = Math.random(); while (!v) v = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+function hit(power, acc) {
+  const c = CLUBS[game.club], lv = LEVELS[game.level], b = game.ball, sc = surface(b.x, b.y);
+  game.prev = { ...b };
+  let shot;
+  // acc > 0: open face (slice); acc < 0: closed face (hook)
+  if (c.putter) {
+    const speed = speedForPutt(game.putScale * FT * Math.min(power, 110) / 100);
+    shot = { speed, launch: 0, rpm: 0, dir: game.aim - acc * 0.004 - gauss() * 0.002 * lv.tilt, putt: true };
+    sfx.strike(true);
+  } else {
+    const lf = lieEffect(sc, game.club);
+    const pw = Math.min(power, 110) / 100, over = Math.max(0, pw - 1);
+    const shapeTilt = [-9, 0, 9][game.shape], shapeStart = [2.2, 0, -2.2][game.shape] * Math.PI / 180;
+    const tr = game.traj - 1;                                         // -1 low, 0 normal, +1 high
+    const err = acc * (1 + over * 6);
+    const tilt = shapeTilt + err * 2.4 + gauss() * lv.tilt * lf.tilt;
+    const speed = c.speed * lv.speed * lf.speed * (pw <= 1 ? (0.25 + 0.75 * pw) : 1 + over * 0.4) * (1 + gauss() * lv.sd) * (1 - Math.abs(tr) * 0.015);
+    const launch = c.launch + lf.launch + (pw < 1 ? (1 - pw) * 4 : 0) + tr * 3.5;
+    const rpm = c.rpm * lf.rpm * (0.6 + 0.4 * lv.speed) * (pw < 1 ? 0.7 + 0.3 * pw : 1) * (1 + tr * 0.15);
+    shot = { speed, launch, rpm, dir: game.aim + shapeStart - err * 0.35 * Math.PI / 180, tilt };
+    sfx.strike(false);
+  }
+  game.strokes++;
+  const res = P.simulate(world(), { x: b.x, y: b.y, z: b.z + (c.putter ? 0 : 0.005) }, shot);
+  playShot(res, c);
+}
+function setPower(p) { $('powerV').textContent = `${Math.round(p)}%`; $('power').classList.toggle('hot', p > 100); }
+
+// ---------------------------------------------------------------- Shot playback and rules
+let playback = null;
+function playShot(res, club) {
+  game.phase = 'flight';
+  aimLine.visible = false; aimRing.visible = false; greenArrows(false);
+  playback = { res, club, t: 0, start: performance.now() / 1000, landed: false, trail: [] };
+  tracer.visible = !club.putter;
+}
+function stepPlayback(now) {
+  const pb = playback; if (!pb) return;
+  const pth = pb.res.path, speed = (pb.club.putter ? 1 : 1.15) * (game.timeScale || 1);
+  pb.t = (now - pb.start) * speed;
+  let i = pb.i || 0; while (i < pth.length - 1 && pth[i + 1][0] < pb.t) i++;
+  pb.i = i;
+  const a = pth[i], q = pth[Math.min(i + 1, pth.length - 1)], span = Math.max(1e-6, q[0] - a[0]), u = Math.min(1, Math.max(0, (pb.t - a[0]) / span));
+  const x = a[1] + (q[1] - a[1]) * u, y = a[2] + (q[2] - a[2]) * u, z = a[3] + (q[3] - a[3]) * u;
+  ballMesh.position.copy(toV(x, y, z));
+  ballMesh.scale.setScalar(Math.max(1, camera.position.distanceTo(ballMesh.position) / 25));
+  if (!pb.club.putter) {
+    pb.trail.push(toV(x, y, z));
+    if (pb.trail.length > 400) pb.trail.shift();
+    tracer.geometry.dispose(); tracer.geometry = new THREE.BufferGeometry().setFromPoints(pb.trail);
+  }
+  if (!pb.landed && pb.res.firstLand && pb.t >= pb.res.firstLand.t) { pb.landed = true; sfx.land(); if (pb.res.hitTree) sfx.tree(); }
+  chaseCamera(x, y, z, pb);
+  if (pb.t >= pth[pth.length - 1][0] + 0.8 * (game.timeScale || 1)) { playback = null; finishShot(pb.res, pb.club); }
+}
+function finishShot(res, club) {
+  const b0 = game.prev, end = res.end;
+  const moved = yds(Math.hypot(end.x - b0.x, end.y - b0.y));
+  game.lastShot = club.putter ? `${Math.round(Math.hypot(end.x - b0.x, end.y - b0.y) / FT)} ft` : `${moved} yd`;
+  if (res.result === 'holed') { sfx.cup(); game.ball = { x: end.x, y: end.y, z: end.z }; holeOut(); return; }
+  if (res.result === 'water') {
+    sfx.splash(); game.penalty++;
+    const pth = res.path; let drop = null;
+    for (let k = pth.length - 1; k >= 0; k -= 2) { const [, x, y] = pth[k]; const s = surface(x, y); if (s !== S.WATER && s !== S.OB && surface(x + 2, y) !== S.WATER && surface(x - 2, y) !== S.WATER && surface(x, y + 2) !== S.WATER && surface(x, y - 2) !== S.WATER) { drop = { x, y }; break; } }
+    drop = drop || { x: b0.x, y: b0.y };
+    game.ball = { x: drop.x, y: drop.y, z: height(drop.x, drop.y) + P.R };
+    toast('Splash · penalty stroke, drop taken');
+  } else if (res.result === 'ob') {
+    game.penalty++; game.ball = { ...b0 };
+    toast('Out of bounds · stroke and distance');
+  } else {
+    let x = end.x, y = end.y, note = '';
+    if (res.surface === S.PATH) {
+      const pp = pin(), d0 = dist2([x, y], pp);
+      search: for (let r = 1; r < 8; r += 0.5) for (let a = 0; a < 16; a++) { const px = x + Math.cos(a * Math.PI / 8) * r, py = y + Math.sin(a * Math.PI / 8) * r; const s = surface(px, py); if (s !== S.PATH && s !== S.WATER && s !== S.OB && dist2([px, py], pp) >= d0 - 0.5) { x = px; y = py; note = ' · free relief from the cart path'; break search; } }
+    }
+    game.ball = { x, y, z: height(x, y) + P.R };
+    toast(club.putter ? `${Math.round(dist2([x, y], pin()) / FT)} ft left` : `${P.SURF[surface(x, y)].name} · ${moved} yd${res.hitTree ? ' · clipped a tree' : ''}${note}`);
+  }
+  if (game.strokes + game.penalty >= curHole().par + 5) { toast('Picked up'); game.scores[game.hole] = curHole().par + 5; game.lastResult = 'Picked up'; saveRound(); showScorecard(true); return; }
+  newAddress();
+}
+function holeOut() {
+  const h = curHole(), n = game.strokes + game.penalty;
+  game.scores[game.hole] = n; saveRound();
+  const names = { '-3': 'Albatross', '-2': 'Eagle', '-1': 'Birdie', 0: 'Par', 1: 'Bogey', 2: 'Double bogey', 3: 'Triple bogey' };
+  const rel = n - h.par;
+  game.lastResult = n === 1 ? 'Hole in one!' : (names[rel] || (rel > 0 ? `+${rel}` : `${rel}`));
+  setTimeout(() => showScorecard(true), 900);
+}
+
+// ---------------------------------------------------------------- Cameras
+const camTarget = new THREE.Vector3(), camPos = new THREE.Vector3();
+function ballTargetY() {
+  const h = window.innerHeight, r = $('bottom').getBoundingClientRect();
+  return Math.min(r.top - 90, h * 0.72);
+}
+function addressCamera(instant) {
+  const b = game.ball, c = CLUBS[game.club];
+  const back = c.putter ? 2.6 : 5.5, up = c.putter ? 1.1 : 1.9;
+  const bx = b.x - Math.cos(game.aim) * back, by = b.y - Math.sin(game.aim) * back;
+  const want = toV(bx, by, Math.max(height(bx, by), b.z) + up);
+  // Tilt the view so the ball sits just above the controls
+  const h = window.innerHeight, fy = (ballTargetY() - h / 2) / (h / 2);
+  const delta = Math.atan(fy * Math.tan(camera.fov * Math.PI / 360));
+  const ballV = toV(b.x, b.y, b.z), dx = ballV.x - want.x, dy = ballV.y - want.y, dz = ballV.z - want.z;
+  const pitch = Math.atan2(dy, Math.hypot(dx, dz)) + delta;
+  const fwd = new THREE.Vector3(Math.cos(game.aim), 0, -Math.sin(game.aim));
+  const look = want.clone().add(fwd.multiplyScalar(Math.cos(pitch) * 50)).add(new THREE.Vector3(0, Math.sin(pitch) * 50, 0));
+  if (instant) { camPos.copy(want); camTarget.copy(look); } else { camPos.lerp(want, 0.12); camTarget.lerp(look, 0.12); }
+}
+function chaseCamera(x, y, z, pb) {
+  const b0 = game.prev;
+  if (pb.club.putter) {
+    const want = toV(b0.x - Math.cos(game.aim) * 2.6, b0.y - Math.sin(game.aim) * 2.6, b0.z + 1.3);
+    camPos.lerp(want, 0.1); camTarget.lerp(toV(x, y, height(x, y)), 0.15); return;
+  }
+  const ang = Math.atan2(y - b0.y, x - b0.x), far = Math.hypot(x - b0.x, y - b0.y);
+  const back = 18 + Math.min(40, far * 0.12), rise = 6 + Math.min(24, far * 0.08);
+  const cx = x - Math.cos(ang) * back, cy = y - Math.sin(ang) * back;
+  camPos.lerp(toV(cx, cy, Math.max(z, height(cx, cy)) + rise), 0.06); camTarget.lerp(toV(x, y, z), 0.2);
+}
+let fly = null;
+function flyover() {
+  game.phase = 'flyover'; $('skip').style.display = 'block';
+  const h = curHole(), T = h.tees[game.tee], pp = pin();
+  const pts = [T, ...h.line.slice(1, -1), pp];
+  fly = { t0: performance.now() / 1000, dur: 2.2 + pts.length * 0.5, pts };
+  toast(`Hole ${game.si + 1} · Par ${h.par} · ${h.yards[game.tee]} yd`, 3200);
+}
+function stepFlyover(now) {
+  const f = fly, u = Math.min(1, (now - f.t0) / f.dur), e = u * u * (3 - 2 * u);
+  const L = f.pts; let tot = 0; const segs = [];
+  for (let i = 0; i < L.length - 1; i++) { const d = dist2(L[i], L[i + 1]); segs.push(d); tot += d; }
+  let s = e * tot, i = 0; while (i < segs.length - 1 && s > segs[i]) { s -= segs[i]; i++; }
+  const k = Math.min(1, s / segs[i]), x = L[i][0] + (L[i + 1][0] - L[i][0]) * k, y = L[i][1] + (L[i + 1][1] - L[i][1]) * k;
+  const ang = Math.atan2(L[i + 1][1] - L[i][1], L[i + 1][0] - L[i][0]);
+  camPos.copy(toV(x - Math.cos(ang) * 70, y - Math.sin(ang) * 70, height(x, y) + 65));
+  camTarget.copy(toV(x + Math.cos(ang) * 50, y + Math.sin(ang) * 50, height(x, y)));
+  if (u >= 1) endFlyover();
+}
+function endFlyover() { fly = null; $('skip').style.display = 'none'; game.phase = 'address'; addressCamera(true); }
+// Lobby backdrop: a slow orbit high over the whole island
+function lobbyCamera(now) {
+  const a = now * 0.035, c = centroid(COURSE.boundary), r = 1150;
+  camPos.copy(toV(c[0] + Math.cos(a) * r, c[1] + Math.sin(a) * r, DEM.zmin + 520));
+  camTarget.copy(toV(c[0], c[1], DEM.zmin + 30));
+}
+
+// ---------------------------------------------------------------- Leaderboard service (Supabase REST; works without it)
+const API = (() => {
+  const cfg = window.SUPABASE || {};
+  const on = !!(cfg.url && cfg.key);
+  const headers = () => { const h = { apikey: cfg.key, 'Content-Type': 'application/json' }; if (!String(cfg.key).startsWith('sb_')) h.Authorization = 'Bearer ' + cfg.key; return h; };
+  const base = on ? cfg.url.replace(/\/$/, '') + '/rest/v1/scores' : '';
+  return {
+    on,
+    async list(mode, day, limit = 1000) {
+      if (!on) return null;
+      const q = new URLSearchParams({ select: 'player,strokes,par,holes,level,tees,created_at', mode: 'eq.' + mode, order: 'strokes.asc,created_at.asc', limit: String(limit) });
+      if (day) q.set('day', 'eq.' + day);
+      const r = await fetch(`${base}?${q}`, { headers: headers() });
+      if (!r.ok) throw new Error('leaderboard ' + r.status);
+      return r.json();
+    },
+    async submit(row) {
+      if (!on) return { ok: false, offline: true };
+      const r = await fetch(base, { method: 'POST', headers: { ...headers(), Prefer: 'return=minimal' }, body: JSON.stringify(row) });
+      if (r.status === 409) return { ok: false, duplicate: true };
+      return { ok: r.ok, status: r.status };
+    },
+  };
+})();
+function clientId() {
+  let id = store.get('clientId', null);
+  if (!id) { id = (crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-8xxx-xxxxxxxxxxxx'.replace(/x/g, () => (Math.random() * 16 | 0).toString(16))); store.set('clientId', id); }
+  return id;
+}
+// Rank with ties: the same score shares a place ("T2")
+function ranked(rows) {
+  return rows.map((r, i) => { const better = rows.filter(o => o.strokes < r.strokes).length, same = rows.filter(o => o.strokes === r.strokes).length; return { ...r, rank: better + 1, tie: same > 1 }; });
+}
+function renderBoard(ol, rows, opts = {}) {
+  ol.textContent = '';
+  if (rows === null) { const li = document.createElement('li'); li.className = 'empty'; li.textContent = API.on ? 'Couldn\'t reach the leaderboard. Check your connection.' : 'The leaderboard is offline. You can still play; scores post once it\'s connected.'; ol.appendChild(li); return; }
+  if (!rows.length) { const li = document.createElement('li'); li.className = 'empty'; li.textContent = opts.empty || 'No scores yet. Be the first.'; ol.appendChild(li); return; }
+  const me = store.get('name', '');
+  for (const r of ranked(rows).slice(0, opts.limit || 10)) {
+    const li = document.createElement('li'); if (opts.mine && opts.mine(r, me)) li.classList.add('me');
+    const rk = document.createElement('span'); rk.className = 'rk num'; rk.textContent = (r.tie ? 'T' : '') + r.rank;
+    const who = document.createElement('span'); who.className = 'who'; who.textContent = r.player;
+    const meta = document.createElement('span'); meta.className = 'meta';
+    meta.textContent = opts.meta ? opts.meta(r) : '';
+    const sc = document.createElement('span'); const rel = r.strokes - r.par; sc.className = 'sc num ' + relClass(rel); sc.textContent = opts.raw ? `${r.strokes}` : fmtRel(rel);
+    li.append(rk, who, meta, sc); ol.appendChild(li);
+  }
+}
+
+// ---------------------------------------------------------------- Scorecard and results
+function scoreClass(s, par) { if (s == null) return ''; const d = s - par; return d <= -2 ? 'eagle' : d === -1 ? 'birdie' : d === 1 ? 'bogey' : d >= 2 ? 'double' : ''; }
+function renderScorecard() {
+  const cols = game.seq;
+  const sum = f => { let s = 0, any = false; for (const i of cols) { const v = f(i); if (typeof v === 'number') { s += v; any = true; } } return any ? s : ''; };
+  const you = i => game.scores[i] == null ? '' : `<span class="ss ${scoreClass(game.scores[i], HOLES[i].par)}">${game.scores[i]}</span>`;
+  const youN = i => game.scores[i];
+  const row = (label, f, cls = '', tot = true, fn = f) => `<tr class="${cls}"><td>${label}</td>${cols.map(i => `<td${cls === 'you' && i === game.hole ? ' class="cur"' : ''}>${f(i) ?? ''}</td>`).join('')}<td>${tot ? sum(fn) : ''}</td></tr>`;
+  let html = `<tr><th>Hole</th>${cols.map(i => `<th>${HOLES[i].n}</th>`).join('')}<th>Tot</th></tr>`;
+  html += row(TEES.find(t => t.k === game.tee).n + ' yd', i => HOLES[i].yards[game.tee]);
+  html += row('Handicap', i => game.tee === 'red' ? HOLES[i].hcpRed : HOLES[i].hcp, '', false);
+  html += row('Par', i => HOLES[i].par);
+  html += row(store.get('name', 'You') || 'You', you, 'you', true, youN);
+  $('scTable').innerHTML = html;
+}
+function modeLabel() { return game.mode === 'daily' ? 'Daily challenge' : game.mode === 'practice' ? 'Practice (not scored)' : 'Free play'; }
+function showScorecard(afterHole) {
+  renderScorecard();
+  const played = game.seq.filter(i => game.scores[i] != null).length;
+  $('scTitle').textContent = afterHole ? (game.lastResult || 'Scorecard') : 'Scorecard';
+  $('scSub').textContent = `${modeLabel()} · ${TEES.find(t => t.k === game.tee).n} tees · ${LEVELS[game.level].n} · ${played ? 'thru ' + played + ' · ' + fmtRel(totalVsPar()) : 'no holes played yet'}`;
+  $('resultBox').hidden = true; $('resultBoard').hidden = true;
+  const btns = $('scButtons'); btns.textContent = '';
+  const add = (label, cls, fn) => { const b = document.createElement('button'); b.className = cls; b.textContent = label; b.onclick = fn; btns.appendChild(b); };
+  if (afterHole) {
+    if (game.si < game.seq.length - 1) add(`Next hole ▸`, 'btnGo', () => { hideSheets(); startHole(game.si + 1); });
+    else add('See results ▸', 'btnGo', finishRound);
+  } else {
+    add('Back to the course', 'btnGo', hideSheets);
+    add(game.mute ? 'Sound: off' : 'Sound: on', 'btnQuiet', function () { game.mute = !game.mute; this.textContent = game.mute ? 'Sound: off' : 'Sound: on'; store.set('mute', game.mute); });
+    add('Leave to lobby', 'btnQuiet', () => { hideSheets(); showLobby(); });
+  }
+  $('scoreSheet').hidden = false;
+}
+function hideSheets() { $('scoreSheet').hidden = true; }
+async function finishRound() {
+  const total = game.seq.reduce((a, i) => a + game.scores[i], 0), par = game.seq.reduce((a, i) => a + HOLES[i].par, 0), rel = total - par;
+  $('scTitle').textContent = game.mode === 'daily' ? 'Daily challenge complete' : game.mode === 'practice' ? 'Practice complete' : 'Round complete';
+  $('resultBox').hidden = false;
+  $('resultBig').textContent = fmtRel(rel);
+  $('resultBig').className = 'bigScore num ' + relClass(rel);
+  $('resultSub').textContent = `${total} strokes on a par ${par}.`;
+  const btns = $('scButtons'); btns.textContent = '';
+  const back = document.createElement('button'); back.className = 'btnGo'; back.textContent = 'Back to the lobby'; back.onclick = () => { hideSheets(); showLobby(); };
+  btns.appendChild(back);
+  if (game.mode === 'practice') { store.set('round', null); return; }
+  const row = { player: store.get('name', 'Player'), mode: game.mode, day: game.mode === 'daily' ? game.day : ptDay(), tees: game.tee, level: LEVELS[game.level].k, strokes: total, par, holes: game.seq.map(i => game.scores[i]), client_id: clientId() };
+  if (game.mode === 'daily') store.set('daily:' + game.day, { scores: game.scores, si: game.si, done: true, total, rel });
+  else { store.set('round', null); const best = store.get('best', null); if (!best || total < best.strokes) store.set('best', { strokes: total, par, tees: game.tee, day: row.day }); }
+  $('resultBoard').hidden = false; $('resultBoardTitle').textContent = game.mode === 'daily' ? 'Today\'s leaderboard' : '18-hole leaderboard';
+  const list = $('resultList'); list.innerHTML = '<li class="empty">Posting your score…</li>';
+  let res = { ok: false };
+  try { res = await API.submit(row); } catch { res = { ok: false }; }
+  $('resultSub').textContent = `${total} strokes on a par ${par}. ` + (res.ok ? 'Posted to the leaderboard.' : res.duplicate ? 'This device already posted today\'s score.' : res.offline ? 'The leaderboard is offline, so it wasn\'t posted.' : 'Couldn\'t post it this time.');
+  try {
+    const rows = await API.list(game.mode, game.mode === 'daily' ? game.day : null, game.mode === 'daily' ? 1000 : 50);
+    renderBoard(list, rows, { limit: 10, mine: (r, me) => r.player === me && r.strokes === total, meta: r => game.mode === 'daily' ? '' : `${r.tees} · ${LEVELS.find(l => l.k === r.level)?.n || ''}` });
+    if (rows && game.mode === 'daily') { const rk = ranked(rows).find(r => r.player === row.player && r.strokes === total); if (rk) $('resultSub').textContent += ` You're ${rk.tie ? 'tied ' : ''}#${rk.rank} of ${rows.length} today.`; }
+  } catch { renderBoard(list, null); }
+}
+
+// ---------------------------------------------------------------- Lobby
+const lobby = { day: TODAY, tab: 'day' };
+function showLobby() {
+  game.phase = 'menu';
+  $('hud').hidden = true; $('lobby').hidden = false;
+  renderLobby();
+}
+function enterGame() { $('lobby').hidden = true; $('hud').hidden = false; }
+function renderLobby() {
+  const name = store.get('name', '');
+  $('nameTxt').textContent = name || 'Pick a name';
+  $('nameAv').textContent = name ? name.trim()[0].toUpperCase() : '?';
+  // Date strip: the last seven days in San Dimas
+  const days = $('days'); days.textContent = '';
+  for (let k = -6; k <= 0; k++) {
+    const d = ptDay(k), dt = dayDate(d);
+    const b = document.createElement('button'); b.className = 'day'; b.setAttribute('aria-pressed', String(d === lobby.day));
+    b.innerHTML = `<div class="d1"></div><div class="d2 num"></div>`;
+    b.querySelector('.d1').textContent = k === 0 ? 'TODAY' : dt.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
+    b.querySelector('.d2').textContent = dt.getDate();
+    b.onclick = () => { lobby.day = d; renderLobby(); };
+    days.appendChild(b);
+  }
+  const isToday = lobby.day === TODAY, dt = dayDate(lobby.day);
+  $('dayLbl').textContent = isToday ? 'TODAY' : 'PAST DAY';
+  $('dayLong').textContent = dt.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+  // Challenge card
+  const holes = dailyHoles(lobby.day), par = holes.reduce((a, i) => a + HOLES[i].par, 0);
+  $('chTitle').textContent = `Holes ${holes.map(i => HOLES[i].n).join(', ')}`;
+  $('chSub').textContent = `3 holes · par ${par} · ${holes.reduce((a, i) => a + HOLES[i].yards.white, 0)} yd · the same for everyone`;
+  drawChallengeArt(holes, lobby.day);
+  const rec = store.get('daily:' + lobby.day, null);
+  const play = $('chPlay'), prac = $('chPractice');
+  if (!isToday) { play.textContent = 'View only'; play.disabled = true; prac.hidden = false; prac.textContent = 'Practice these holes'; }
+  else if (rec && rec.done) { play.textContent = `Played · ${fmtRel(rec.rel)}`; play.disabled = true; prac.hidden = false; prac.textContent = 'Practice'; }
+  else { play.disabled = false; play.textContent = rec && rec.scores && rec.scores.some(s => s != null) ? 'Resume →' : 'Play →'; prac.hidden = true; }
+  // Free play settings
+  const teeSeg = $('teeSeg'), levelSeg = $('levelSeg'); teeSeg.textContent = ''; levelSeg.textContent = '';
+  TEES.forEach(t => { const b = document.createElement('button'); b.textContent = `${t.n} · ${HOLES.reduce((a, h) => a + h.yards[t.k], 0)} yd`; b.setAttribute('aria-pressed', String(game.tee === t.k)); b.onclick = () => { game.tee = t.k; store.set('prefs', { tee: game.tee, level: game.level }); renderLobby(); }; teeSeg.appendChild(b); });
+  LEVELS.forEach((l, i) => { const b = document.createElement('button'); b.textContent = l.n; b.setAttribute('aria-pressed', String(game.level === i)); b.onclick = () => { game.level = i; store.set('prefs', { tee: game.tee, level: game.level }); renderLobby(); }; levelSeg.appendChild(b); });
+  const saved = store.get('round', null);
+  $('freeResume').hidden = !(saved && saved.scores && saved.scores.some(s => s == null) && saved.scores.some(s => s != null));
+  const best = store.get('best', null);
+  $('recMe').textContent = best ? `${best.strokes}` : '—';
+  $('recMeSub').textContent = best ? `${fmtRel(best.strokes - best.par)} · ${best.tees} tees` : 'not played';
+  $('netNote').textContent = API.on ? 'Scores are shared with everyone who has the link. Your name is the only thing posted.' : 'The leaderboard isn\'t connected yet. Everything else works.';
+  refreshBoards();
+}
+async function refreshBoards() {
+  const day = lobby.day, tab = lobby.tab;
+  $('tabDay').setAttribute('aria-pressed', String(tab === 'day')); $('tabRounds').setAttribute('aria-pressed', String(tab === 'rounds'));
+  $('boardTitle').textContent = tab === 'day' ? (day === TODAY ? 'Today\'s leaderboard' : 'That day\'s leaderboard') : '18-hole leaderboard';
+  const me = store.get('name', '');
+  let dayRows = null, roundRows = null;
+  try { dayRows = await API.list('daily', day); } catch { dayRows = null; }
+  try { roundRows = await API.list('round', null, 50); } catch { roundRows = null; }
+  if (lobby.day !== day || lobby.tab !== tab) return;         // the lobby changed while we waited
+  const rows = tab === 'day' ? dayRows : roundRows;
+  const full = $('boardMore');
+  renderBoard($('board'), rows, { limit: lobby.full ? 100 : 10, mine: (r) => r.player === me, meta: r => tab === 'day' ? '' : `${r.tees}`, empty: tab === 'day' ? 'No scores for this day yet.' : 'No full rounds yet.' });
+  full.hidden = !rows || rows.length <= 10 || lobby.full;
+  // Score distribution for the day's challenge
+  const bins = [...Array(17)].map(() => 0), labels = [];
+  for (let d = -6; d <= 10; d++) labels.push(d >= 10 ? '10+' : fmtRel(d));
+  const mine = store.get('daily:' + day, null);
+  for (const r of dayRows || []) bins[Math.max(0, Math.min(16, r.strokes - r.par + 6))]++;
+  const mx = Math.max(1, ...bins);
+  $('dist').textContent = ''; $('distLbl').textContent = '';
+  bins.forEach((n, k) => {
+    const bar = document.createElement('div'); bar.className = 'bar' + (mine && mine.done && Math.max(0, Math.min(16, mine.rel + 6)) === k ? ' me' : '');
+    bar.style.height = `${(n / mx) * 100}%`; bar.title = `${labels[k]}: ${n}`; $('dist').appendChild(bar);
+    const l = document.createElement('span'); l.textContent = labels[k]; $('distLbl').appendChild(l);
+  });
+  const rec = roundRows && roundRows.length ? roundRows[0] : null;
+  $('recAll').textContent = rec ? `${rec.strokes}` : '—';
+  $('recWho').textContent = rec ? rec.player : (API.on ? 'nobody yet' : 'offline');
+}
+function drawChallengeArt(holes, day) {
+  const cv = $('chCanvas'), r = cv.getBoundingClientRect(), dpr = Math.min(2, window.devicePixelRatio || 1);
+  const w = Math.max(300, Math.round(r.width * dpr)), h = Math.max(180, Math.round(r.height * dpr));
+  cv.width = w; cv.height = h;
+  const g = cv.getContext('2d'), pins = pickPins(seedOf(day));
+  g.fillStyle = '#2f5a3d'; g.fillRect(0, 0, w, h);
+  const pw = w / 3;
+  holes.forEach((hi, k) => {
+    g.save(); g.translate(k * pw, 0); g.beginPath(); g.rect(0, 0, pw, h); g.clip();
+    drawHole(g, holeFrame(hi, 'white', pins[hi], pw, h, 20), pw, h, pins[hi], '#2f5a3d');
+    g.restore();
+  });
+}
+
+// ---------------------------------------------------------------- Starting play
+function needName(then) {
+  if (store.get('name', '')) { then(); return; }
+  $('nameSheet').hidden = false; $('nameErr').textContent = ''; $('nameInput').value = '';
+  setTimeout(() => $('nameInput').focus(), 50);
+  needName.then = then;
+}
+$('nameForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const v = $('nameInput').value.replace(/\s+/g, ' ').trim();
+  if (!v) { $('nameErr').textContent = 'Type a name to put on the leaderboard.'; return; }
+  if (v.length > 20) { $('nameErr').textContent = 'Keep it to 20 characters.'; return; }
+  store.set('name', v); $('nameSheet').hidden = true;
+  const then = needName.then; needName.then = null;
+  if (then) then(); else renderLobby();
+});
+$('nameChip').onclick = () => { needName.then = null; $('nameSheet').hidden = false; $('nameInput').value = store.get('name', ''); $('nameErr').textContent = ''; setTimeout(() => $('nameInput').focus(), 50); };
+
+function beginRound({ mode, day, seq, tee, level, scores, si = 0 }) {
+  game.mode = mode; game.day = day; game.seq = seq; game.tee = tee; game.level = level;
+  game.scores = scores || Array(18).fill(null);
+  game.pins = pickPins(seedOf(day)); game.winds = windsFor(seedOf(day));
+  buildCarryTable(LEVELS[level]);
+  enterGame();
+  startHole(si);
+}
+$('chPlay').onclick = () => { audio(); needName(() => {
+  const rec = store.get('daily:' + TODAY, null);
+  const scores = rec && rec.scores ? rec.scores : null;
+  const seq = dailyHoles(TODAY), si = scores ? Math.max(0, seq.findIndex(i => scores[i] == null)) : 0;
+  beginRound({ mode: 'daily', day: TODAY, seq, tee: 'white', level: 2, scores, si });
+}); };
+$('chPractice').onclick = () => { audio(); beginRound({ mode: 'practice', day: lobby.day, seq: dailyHoles(lobby.day), tee: 'white', level: 2 }); };
+$('freeGo').onclick = () => { audio(); needName(() => beginRound({ mode: 'round', day: TODAY, seq: [...HOLES.keys()], tee: game.tee, level: game.level })); };
+$('freeResume').onclick = () => {
+  audio();
+  const s = store.get('round', null); if (!s) return;
+  const si = Math.max(0, s.scores.findIndex(v => v == null));
+  needName(() => beginRound({ mode: 'round', day: TODAY, seq: [...HOLES.keys()], tee: s.tee, level: s.level, scores: s.scores, si }));
+};
+$('tabDay').onclick = () => { lobby.tab = 'day'; lobby.full = false; refreshBoards(); };
+$('tabRounds').onclick = () => { lobby.tab = 'rounds'; lobby.full = false; refreshBoards(); };
+$('boardMore').onclick = () => { lobby.full = true; refreshBoards(); };
+
+// ---------------------------------------------------------------- In-game input
+$('skip').onclick = () => { if (game.phase === 'flyover') endFlyover(); };
+$('cardBtn').onclick = () => { if (game.phase === 'address' || game.phase === 'flyover') { if (game.phase === 'flyover') endFlyover(); showScorecard(false); } };
+$('mapBtn').onclick = () => { const box = $('mapBox'); box.hidden = !box.hidden; $('mapBtn').setAttribute('aria-pressed', String(!box.hidden)); store.set('map', !box.hidden); drawMinimap(); };
+const bump = (key, d, n) => { if (game.phase !== 'address') return; game[key] = Math.max(0, Math.min(n - 1, game[key] + d)); updateHud(); };
+$('shapeL').onclick = () => bump('shape', -1, 3); $('shapeR').onclick = () => bump('shape', 1, 3);
+$('trajD').onclick = () => bump('traj', -1, 3); $('trajU').onclick = () => bump('traj', 1, 3);
+const nudge = d => { if (game.phase !== 'address') return; game.aim += d; updateAimVisuals(); updateHud(); };
+let holdAim = null;
+for (const [id, d] of [['aimL', 1], ['aimR', -1]]) {
+  const el = $(id);
+  el.addEventListener('pointerdown', e => { e.preventDefault(); nudge(d * 0.004); holdAim = setInterval(() => nudge(d * 0.006), 40); });
+  for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) el.addEventListener(ev, () => clearInterval(holdAim));
+}
+// Slingshot swing: grab the ball, drag back for power, release to hit. The lean of the pull is the miss.
+let drag = null, pull = null;
+function ballScreen() {
+  const v = ballMesh.position.clone().project(camera), r = canvas.getBoundingClientRect();
+  return { x: r.left + (v.x + 1) / 2 * r.width, y: r.top + (1 - v.y) / 2 * r.height, onScreen: v.z < 1 && v.x > -1 && v.x < 1 && v.y > -1 && v.y < 1 };
+}
+const pullMax = () => Math.max(120, Math.min(window.innerHeight * 0.34, 280));
+function pullState(e) {
+  const dx = e.clientX - pull.bx, dy = e.clientY - pull.by;
+  const power = Math.max(0, Math.min(115, dy / pullMax() * 100));
+  const ang = Math.atan2(dx, Math.max(dy, 1)) * 180 / Math.PI;
+  const off = Math.sign(ang) * Math.max(0, Math.abs(ang) - 3);
+  return { power, acc: Math.max(-15, Math.min(15, -off / 3)), dx, dy };
+}
+function drawPull(st) {
+  const putter = CLUBS[game.club].putter;
+  $('pull').style.display = 'block';
+  const ex = pull.bx + st.dx, ey = pull.by + Math.max(0, st.dy);
+  const line = $('pullLine');
+  line.setAttribute('x1', pull.bx); line.setAttribute('y1', pull.by); line.setAttribute('x2', ex); line.setAttribute('y2', ey);
+  const miss = Math.abs(st.acc);
+  line.setAttribute('stroke', st.power < 5 ? 'rgba(255,255,255,0.5)' : st.power > 100 ? '#ff6b5b' : miss < 1 ? '#ffffff' : miss < 4 ? '#f3c969' : '#ff9a6a');
+  const dot = $('pullDot'); dot.setAttribute('cx', ex); dot.setAttribute('cy', ey);
+  const txt = $('pullTxt'); txt.setAttribute('x', pull.bx); txt.setAttribute('y', pull.by - 46);
+  txt.textContent = st.power < 5 ? 'let go to cancel' : putter ? `${Math.round(game.putScale * st.power / 100)} ft` : `${Math.round(st.power)}%${st.power > 100 ? ' over' : ''}`;
+  setPower(st.power);
+}
+function endPull() { pull = null; $('pull').style.display = 'none'; }
+canvas.addEventListener('pointerdown', e => {
+  audio();
+  if (game.phase === 'flyover') { endFlyover(); return; }
+  if (game.phase !== 'address') return;
+  const b = ballScreen();
+  if (b.onScreen && Math.hypot(e.clientX - b.x, e.clientY - b.y) < 60) {
+    pull = { bx: b.x, by: b.y, id: e.pointerId };
+    game.phase = 'swing'; aimRing.visible = false;
+    try { canvas.setPointerCapture(e.pointerId); } catch { /* not supported */ }
+    drawPull(pullState(e));
+  } else drag = { x: e.clientX, aim: game.aim };
+});
+window.addEventListener('pointermove', e => {
+  if (pull && e.pointerId === pull.id) { drawPull(pullState(e)); return; }
+  if (!drag || game.phase !== 'address') return;
+  game.aim = drag.aim - (e.clientX - drag.x) * 0.0022; updateAimVisuals(); updateHud();
+});
+function cancelPull() { endPull(); game.phase = 'address'; setPower(0); aimRing.visible = !CLUBS[game.club].putter; }
+window.addEventListener('pointerup', e => {
+  drag = null;
+  if (!pull || e.pointerId !== pull.id) return;
+  const st = pullState(e); endPull();
+  if (st.power < 5) { cancelPull(); return; }
+  hit(st.power, st.acc);
+});
+window.addEventListener('pointercancel', e => { if (pull && e.pointerId === pull.id) cancelPull(); drag = null; });
+window.addEventListener('keydown', e => {
+  if ($('hud').hidden || !$('scoreSheet').hidden || !$('nameSheet').hidden) return;
+  const k = e.key.toLowerCase();
+  if (e.code === 'Escape') { if (pull) cancelPull(); }
+  else if (e.code === 'ArrowLeft') nudge(e.shiftKey ? 0.02 : 0.006);
+  else if (e.code === 'ArrowRight') nudge(e.shiftKey ? -0.02 : -0.006);
+  else if (k === 'a') bump('shape', -1, 3); else if (k === 'd') bump('shape', 1, 3);
+  else if (k === 'w') bump('traj', 1, 3); else if (k === 's') bump('traj', -1, 3);
+  else if (k === 'm') { game.mute = !game.mute; store.set('mute', game.mute); toast(game.mute ? 'Sound off' : 'Sound on', 1200); }
+  else if (k === 'c') $('cardBtn').click();
+  else if (/^[0-9]$/.test(k)) { const idx = KEYED[(Number(k) + 9) % 10]; if (idx != null) selectClub(idx); }
+});
+
+// ---------------------------------------------------------------- Main loop
+function resize() { const w = window.innerWidth, h = window.innerHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+window.addEventListener('resize', () => { resize(); if (!$('lobby').hidden) drawChallengeArt(dailyHoles(lobby.day), lobby.day); });
+function frame() {
+  const now = performance.now() / 1000;
+  if (game.phase === 'menu') lobbyCamera(now);
+  else if (game.phase === 'flyover' && fly) stepFlyover(now);
+  else if (game.phase === 'flight') stepPlayback(now);
+  else if (game.ball && (game.phase === 'address' || game.phase === 'swing')) {
+    addressCamera(false);
+    ballMesh.position.copy(toV(game.ball.x, game.ball.y, game.ball.z)); ballMesh.scale.setScalar(1);
+  }
+  camera.position.copy(camPos); camera.lookAt(camTarget);
+  const grab = $('grab');
+  if (game.phase === 'address' && !pull && $('scoreSheet').hidden) {
+    camera.updateMatrixWorld(); const bs = ballScreen();
+    grab.style.display = bs.onScreen ? 'block' : 'none';
+    if (bs.onScreen) { grab.style.left = bs.x + 'px'; grab.style.top = bs.y + 'px'; }
+  } else grab.style.display = 'none';
+  const focus = game.phase === 'menu' ? camTarget : ballMesh.position;
+  sun.target.position.copy(focus); sun.position.copy(focus).addScaledVector(SUN_DIR, 400);
+  game.sky.position.copy(camera.position);
+  const cloth = flag.userData.cloth, pa = cloth.geometry.attributes.position;
+  if (!cloth.userData.base) cloth.userData.base = Float32Array.from(pa.array);
+  const base = cloth.userData.base, w = game.winds[game.hole] || { mph: 0 };
+  for (let i = 0; i < pa.count; i++) { const x = base[i * 3]; pa.array[i * 3 + 2] = base[i * 3 + 2] + Math.sin(now * (3 + w.mph * 0.3) + x * 9) * x * 0.12 * (0.3 + w.mph / 12); }
+  pa.needsUpdate = true;
+  flag.rotation.y = Math.PI / 2 - (w.from + Math.PI);
+  if (!game.noRender) renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+
+// ---------------------------------------------------------------- Boot
+function boot(hot) {
+  const prefs = store.get('prefs', null); if (prefs) { game.tee = prefs.tee; game.level = prefs.level; }
+  game.mute = store.get('mute', false);
+  if (store.get('map', true) === false || window.innerWidth < 640 && store.get('map', null) === null) { $('mapBox').hidden = true; $('mapBtn').setAttribute('aria-pressed', 'false'); }
+  buildTerrain(); buildTrees(); buildBuildings();
+  buildCarryTable(LEVELS[game.level]); buildPuttTable();
+  resize();
+  const T = HOLES[0].tees[game.tee];
+  game.ball = { x: T[0], y: T[1], z: height(T[0], T[1]) + P.R };
+  const pp = pin(); flag.position.copy(toV(pp[0], pp[1], height(pp[0], pp[1])));
+  $('loading').remove();
+  if (hot && hot.started) beginRound({ mode: hot.mode, day: hot.day, seq: hot.seq, tee: hot.tee, level: hot.level, scores: hot.scores, si: hot.si });
+  else showLobby();
+  window.claude?.hot?.snapshot?.(() => ({ started: game.phase !== 'menu', mode: game.mode, day: game.day, seq: game.seq, si: game.si, tee: game.tee, level: game.level, scores: game.scores }));
+  requestAnimationFrame(frame);
+  window.__golf = { game, hit, caddie, defaultAim, world, surface, height, HOLES, CLUBS, carryTable: () => carryTable, trees, startHole, beginRound, dailyHoles, P, API, showLobby };
+}
+const start = data => { try { boot(data); } catch (err) { $('loading').textContent = 'Could not start: ' + err.message; throw err; } };
+window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
+</script>
