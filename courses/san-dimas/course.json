@@ -22,7 +22,7 @@
     }
   },
   "rating": { "blue": "71.7 / 126", "white": "M 70.0 / 122 · W 75.2 / 132", "red": "M 66.5 / 109 · W 72.5 / 128" },
-  "style": { "treeSeed": 91773, "treeGrid": 7, "treeChance": 0.5, "clearLine": 20, "clearRough": 7, "dryRough": 0.3 },
+  "style": { "treeSeed": 91773, "treeGrid": 7, "treeChance": 0.5, "clearLine": 20, "clearRough": 7, "dryRough": 0.3, "fountains": true },
   "landmarks": [
     { "hole": 4, "kind": "box", "from": "white", "yards": 220, "across": -0.45, "note": "Electrical box, left-center of the fairway (Ron, 2026-09-25)" },
     { "hole": 4, "kind": "tree", "from": "green", "yards": 60, "across": 0, "note": "Tree in the middle of the fairway, about 60 yd short of the green (Ron, 2026-09-25)" },

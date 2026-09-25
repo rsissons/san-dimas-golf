@@ -832,11 +832,13 @@ function buildTerrain() {
   scene.add(new THREE.Mesh(wgeo, new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide, flatShading: true })));
   // Ponds: a shiny surface at the water level, so they catch the light
   const waterMat = new THREE.MeshPhongMaterial({ color: '#2fa9c4', specular: '#ffffff', shininess: 120, transparent: true, opacity: 0.92 });
+  ponds.length = 0;
   for (const f of F.water) {
     const ring0 = f.o;
     let zs = []; for (const q of ring0) zs.push(height(q[0], q[1]));
     zs.sort((a, b) => a - b);
     const level = zs[Math.floor(zs.length * 0.2)] + 0.12;
+    ponds.push({ ring: ring0, level });
     const shape = new THREE.Shape(ring0.map(q => new THREE.Vector2(q[0], q[1])));
     const wg = new THREE.ShapeGeometry(shape, 6);
     const wp = wg.attributes.position;
@@ -848,6 +850,61 @@ function buildTerrain() {
   // A soft floor far below reads as haze over the valley
   const floor = new THREE.Mesh(new THREE.CircleGeometry(6000, 48).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: '#9ed6d4' }));
   floor.position.y = base - 160; scene.add(floor);
+}
+
+// Pond fountains (course style "fountains"): a jet in the middle of each pond, spray falling back, a ripple
+// ring at the base. Scenery only; the pond plays as water as always.
+const ponds = [], fountains = [];
+function buildFountains() {
+  if (!STYLE.fountains) return;
+  const area = r => Math.abs(r.reduce((a, p, i) => a + p[0] * r[(i + 1) % r.length][1] - r[(i + 1) % r.length][0] * p[1], 0)) / 2;
+  for (const pd of ponds) {
+    const A = area(pd.ring); if (A < 600) continue;
+    // The spot farthest from the banks
+    const xs = pd.ring.map(p => p[0]), ys = pd.ring.map(p => p[1]);
+    let best = null;
+    for (let x = Math.min(...xs); x <= Math.max(...xs); x += 1.5) for (let y = Math.min(...ys); y <= Math.max(...ys); y += 1.5) {
+      if (!pointIn([x, y], pd.ring)) continue;
+      const d = edgeDist([x, y], pd.ring); if (!best || d > best.d) best = { x, y, d };
+    }
+    if (!best) continue;
+    const H = Math.min(8, Math.max(3.2, 2.2 + Math.sqrt(A) * 0.075)), N = Math.min(700, 260 + Math.round(A / 12));
+    const pos = new Float32Array(N * 3), st = new Float32Array(N * 5);            // age, life, vx, vy, vz
+    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    const spray = new THREE.Points(geo, new THREE.PointsMaterial({ color: '#f2faff', size: 0.32, transparent: true, opacity: 0.85, depthWrite: false }));
+    spray.frustumCulled = false; scene.add(spray);
+    const v0 = Math.sqrt(2 * 9.81 * H);
+    const f = { x: best.x, y: best.y, z: pd.level, H, N, pos, st, v0, spray, geo };
+    for (let i = 0; i < N; i++) spawnDrop(f, i, Math.random() * 1.6);
+    // A soft column where the jet is densest, and a ripple ring on the water
+    const col = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.28, H * 0.92, 10, 1, true).translate(0, H * 0.46, 0), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.45, depthWrite: false, side: THREE.DoubleSide }));
+    col.position.copy(toV(f.x, f.y, f.z)); scene.add(col);
+    const ring = new THREE.Mesh(new THREE.RingGeometry(0.6, 1.0, 36).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.5, depthWrite: false }));
+    ring.position.copy(toV(f.x, f.y, f.z + 0.02)); scene.add(ring);
+    f.ring = ring; fountains.push(f);
+  }
+}
+function spawnDrop(f, i, age = 0) {
+  const a = Math.random() * Math.PI * 2, spread = 0.35 + Math.random() * 0.9, up = f.v0 * (0.82 + Math.random() * 0.2);
+  f.st.set([age, 1.6 + Math.random() * 0.8, Math.cos(a) * spread, Math.sin(a) * spread, up], i * 5);
+}
+function animateFountains(now) {
+  if (!fountains.length) return;
+  const dt = Math.min(0.05, now - (animateFountains.last || now)); animateFountains.last = now;
+  const w = windVec();
+  for (const f of fountains) {
+    for (let i = 0; i < f.N; i++) {
+      const k = i * 5; let age = f.st[k] + dt;
+      const vx = f.st[k + 2] + w.x * 0.08 * age, vy = f.st[k + 3] + w.y * 0.08 * age, vz = f.st[k + 4];
+      let z = vz * age - 4.905 * age * age;
+      if (z < 0 && age > 0.2) { spawnDrop(f, i); age = 0; z = 0; }
+      f.st[k] = age;
+      const v = toV(f.x + vx * age, f.y + vy * age, f.z + Math.max(0, z));
+      f.pos[i * 3] = v.x; f.pos[i * 3 + 1] = v.y; f.pos[i * 3 + 2] = v.z;
+    }
+    f.geo.attributes.position.needsUpdate = true;
+    const ph = (now * 0.8) % 1; f.ring.scale.setScalar(1 + ph * 3.5); f.ring.material.opacity = 0.5 * (1 - ph);
+  }
 }
 
 function buildTrees() {
@@ -2043,6 +2100,7 @@ function frame() {
   pa.needsUpdate = true;
   flag.rotation.y = Math.PI / 2 - (w.from + Math.PI);
   animateGreenRead(now);
+  animateFountains(now);
   if (!game.noRender) renderer.render(scene, camera);
   requestAnimationFrame(frame);
 }
@@ -2053,7 +2111,7 @@ function boot(hot) {
   if (prefs) { if (TEES.some(t => t.k === prefs.tee)) game.tee = prefs.tee; game.level = prefs.level; }
   game.mute = store.get('mute', false);
   if (store.get('map', true) === false || window.innerWidth < 640 && store.get('map', null) === null) { $('mapBox').hidden = true; $('mapBtn').setAttribute('aria-pressed', 'false'); }
-  buildTerrain(); buildTrees(); buildBuildings(); buildPower();
+  buildTerrain(); buildFountains(); buildTrees(); buildBuildings(); buildPower();
   buildCarryTable(LEVELS[game.level]); buildPuttTable();
   resize();
   const T = HOLES[0].tees[game.tee];
