@@ -267,7 +267,7 @@
       </div>
       <div class="panel" style="display:grid;gap:10px">
         <div><h3>How to play</h3><p>Put your finger on the ball, drag back to set power, and let go. Pull straight back for a straight shot; lean right and it hooks, lean left and it slices. Drag anywhere else to aim, or tap the map. Pick clubs along the bottom, shape the shot with ◀ ▶ and flight it with ▼ ▲. On the green, light and dark shading shows the high and low side, and thin lines drift the way it breaks.</p></div>
-        <p class="fine">The real course: holes, bunkers, greens and water traced by <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">© OpenStreetMap contributors</a>, on USGS 3DEP 1-metre elevation. Ball flight calibrated to TrackMan tour averages. Unofficial fan game; not affiliated with the course.</p>
+        <p class="fine">The real course: holes, bunkers, greens and water traced by <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">© OpenStreetMap contributors</a>, on USGS 3DEP 1-metre elevation. Ball flight calibrated to TrackMan tour averages. Sounds: <a href="https://freesound.org" target="_blank" rel="noreferrer">Freesound</a> recordings (CC0) by Scottrex05, Mikes-MultiMedia, lmbubec, zolopher and aidansamuel. Unofficial fan game; not affiliated with the course.</p>
         <p class="fine" id="netNote"></p>
       </div>
     </div>
@@ -299,6 +299,7 @@
 <script>/*__DATA__*/</script>
 <script>/*__PHYSICS__*/</script>
 <script>/*__SUPABASE__*/</script>
+<script>/*__SOUNDS__*/</script>
 <script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.min.js" } }</script>
 <script type="module">
 import * as THREE from 'three';
@@ -839,6 +840,7 @@ function audio() {
     } catch { actx = null; }
   }
   if (actx && actx.state === 'suspended') actx.resume();
+  if (actx) loadClips();
   return actx;
 }
 const NOISE = {};
@@ -865,10 +867,45 @@ function ring(t, { freq = 1000, dur = 0.1, vol = 0.3, type = 'sine', bend = 1 })
   o.connect(g).connect(master); o.start(t); o.stop(t + dur + 0.02);
 }
 const sound = fn => (...args) => { const a = audio(); if (!a || game.mute) return; fn(a.currentTime + 0.005, ...args); };
+// Recorded clips (Freesound, CC0), decoded on first use; the synthesized versions stand in until they're ready
+const CLIPS = {};
+let clipsLoading = false;
+function loadClips() {
+  if (clipsLoading || !actx || !window.SOUND_CLIPS) return;
+  clipsLoading = true;
+  for (const [name, url] of Object.entries(window.SOUND_CLIPS)) {
+    fetch(url).then(r => r.arrayBuffer()).then(b => new Promise((ok, no) => actx.decodeAudioData(b, ok, no))).then(buf => { CLIPS[name] = buf; }).catch(() => {});
+  }
+}
+function clip(name, { vol = 1, rate = 1, delay = 0 } = {}) {
+  const a = audio(); if (!a || game.mute) return false;
+  loadClips();
+  const buf = CLIPS[name]; if (!buf) return false;
+  const src = a.createBufferSource(); src.buffer = buf; src.playbackRate.value = rate;
+  const g = a.createGain(); g.gain.value = vol;
+  src.connect(g).connect(master); src.start(a.currentTime + 0.003 + delay);
+  return true;
+}
+const jitter = (n = 0.03) => 1 + (Math.random() - 0.5) * 2 * n;
+// Woods get the driver recording (a little lower for the fairway woods); irons rotate between takes, pitched up
+// slightly as the clubs get shorter; wedges get the softer, turfier hit
+function clipIdxSound(i, p) {
+  const vol = 0.35 + 0.65 * p;
+  if (i <= 3) return clip('drive', { vol, rate: (1 - i * 0.025) * jitter(0.015) });
+  if (i >= 10) return clip('wedge', { vol: vol * 0.9, rate: (1 + (i - 10) * 0.02) * jitter(0.02) });
+  const take = ['iron1', 'iron2', 'crisp'][Math.floor(Math.random() * 3)];
+  return clip(take, { vol, rate: (0.97 + (i - 4) * 0.012) * jitter(0.015) });
+}
 const sfx = {
   // The swing: a quick rising whoosh just before contact
-  swing: sound((t, power) => burst(t, { dur: 0.16, type: 'bandpass', freq: 500, sweepTo: 2400, q: 1.4, vol: 0.18 * Math.min(1, power / 100), attack: 0.1 })),
-  strike: sound((t, clubIdx, power) => {
+  swing: (power) => { if (power > 40) clip('swoosh', { vol: 0.3 * Math.min(1, power / 100), rate: jitter(0.04) }); },
+  strike: (clubIdx, power) => {
+    const p = Math.max(0.2, Math.min(1.1, power / 100)), c = CLUBS[clubIdx];
+    const played = c.putter ? clip('putt', { vol: 0.55 + 0.45 * Math.sqrt(p), rate: jitter(0.02) })
+      : clipIdxSound(clubIdx, p);
+    if (!played) sfx.strikeSynth(clubIdx, power);
+  },
+  strikeSynth: sound((t, clubIdx, power) => {
     const p = Math.max(0.25, Math.min(1.1, power / 100));
     const c = CLUBS[clubIdx];
     if (c.putter) {                       // putter: a soft, woody "tock"
@@ -892,7 +929,7 @@ const sfx = {
   }),
   // Landing: what it sounds like depends on what it lands on, and fades with distance
   land: sound((t, sc, dist) => {
-    const v = Math.min(1, 45 / (dist + 20));
+    const v = 0.7 * Math.min(1, 45 / (dist + 20));
     if (v < 0.04) return;
     if (sc === S.PATH) { burst(t, { dur: 0.02, type: 'highpass', freq: 2800, vol: 0.5 * v }); ring(t, { freq: 1350, dur: 0.06, vol: 0.12 * v }); return; }
     if (sc === S.BUNKER) { burst(t, { dur: 0.16, type: 'bandpass', freq: 900, q: 0.6, vol: 0.35 * v, attack: 0.006 }); return; }
@@ -900,8 +937,9 @@ const sfx = {
     ring(t, { freq: 95, dur: 0.08, vol: 0.35 * v, bend: 0.7 });
     burst(t, { dur: 0.07, type: 'lowpass', freq: sc === S.GREEN ? 380 : 520, vol: 0.4 * v, attack: 0.003 });
   }),
-  // The cup: the ball rattles in the plastic liner, then settles
-  cup: sound(t => {
+  // The cup: a real ball-in-the-hole recording (two takes, alternated)
+  cup: () => { if (!clip(Math.random() < 0.5 ? 'cup1' : 'cup2', { vol: 1, rate: jitter(0.015) })) sfx.cupSynth(); },
+  cupSynth: sound(t => {
     [[0, 2200, 0.28], [0.065, 1850, 0.22], [0.11, 1600, 0.16], [0.145, 1500, 0.1]].forEach(([dt, f, v]) => { ring(t + dt, { freq: f, dur: 0.035, vol: v }); burst(t + dt, { dur: 0.008, type: 'highpass', freq: 3000, vol: v * 0.8 }); });
     ring(t + 0.18, { freq: 260, dur: 0.12, vol: 0.3, bend: 0.8 });
     burst(t + 0.18, { dur: 0.08, type: 'lowpass', freq: 600, vol: 0.2 });
@@ -1766,7 +1804,7 @@ function boot(hot) {
   else showLobby();
   window.claude?.hot?.snapshot?.(() => ({ started: game.phase !== 'menu', mode: game.mode, day: game.day, seq: game.seq, si: game.si, tee: game.tee, level: game.level, scores: game.scores }));
   requestAnimationFrame(frame);
-  window.__golf = { game, hit, caddie, newAddress, HOLE_FW, F, defaultAim, world, surface, height, HOLES, CLUBS, carryTable: () => carryTable, trees, startHole, beginRound, dailyHoles, P, API, showLobby };
+  window.__golf = { game, hit, caddie, newAddress, HOLE_FW, F, CLIPS, clip, sfx, audio, defaultAim, world, surface, height, HOLES, CLUBS, carryTable: () => carryTable, trees, startHole, beginRound, dailyHoles, P, API, showLobby };
 }
 const start = data => { try { boot(data); } catch (err) { $('loading').textContent = 'Could not start: ' + err.message; throw err; } };
 window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});

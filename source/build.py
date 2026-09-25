@@ -10,7 +10,12 @@ phys = open(os.path.join(here, 'physics.js'), encoding='utf-8').read()
 cfg_path = os.path.join(root, 'supabase.json')
 cfg = json.load(open(cfg_path)) if os.path.exists(cfg_path) else {}
 supa = 'window.SUPABASE = ' + json.dumps({k: cfg[k] for k in ('url', 'key') if k in cfg}) + ';'
-out = src.replace('/*__DATA__*/', data).replace('/*__PHYSICS__*/', phys).replace('/*__SUPABASE__*/', supa)
+# Recorded sounds (Freesound, CC0; see data/sounds/CREDITS.md), embedded so the page stays one file
+import base64, glob
+snd_dir = os.path.join(root, 'data', 'sounds')
+clips = {os.path.splitext(os.path.basename(f))[0]: 'data:audio/mpeg;base64,' + base64.b64encode(open(f, 'rb').read()).decode() for f in sorted(glob.glob(os.path.join(snd_dir, '*.mp3')))}
+sounds = 'window.SOUND_CLIPS = ' + json.dumps(clips) + ';'
+out = src.replace('/*__DATA__*/', data).replace('/*__PHYSICS__*/', phys).replace('/*__SUPABASE__*/', supa).replace('/*__SOUNDS__*/', sounds)
 open(os.path.join(root, 'san-dimas-canyon-18.html'), 'w', encoding='utf-8').write(out)
 page = ('<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n'
         '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n'
@@ -19,4 +24,4 @@ page = ('<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n'
         '</head>\n<body>\n' + out + '\n</body>\n</html>\n')
 os.makedirs(os.path.join(root, 'site'), exist_ok=True)
 open(os.path.join(root, 'site', 'index.html'), 'w', encoding='utf-8').write(page)
-print('built', round(len(out.encode()) / 1024), 'KB · leaderboard', 'connected' if cfg.get('url') else 'not configured')
+print('built', round(len(out.encode()) / 1024), 'KB · leaderboard', 'connected' if cfg.get('url') else 'not configured', '·', len(clips), 'sound clips')

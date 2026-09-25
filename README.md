@@ -22,4 +22,4 @@ Unofficial fan game; not affiliated with the course or American Golf.
 The leaderboard is a Supabase table (`supabase-setup.sql`). Put the project URL and the publishable (anon) key in `supabase.json` as `{"url": "...", "key": "..."}` before building. That key is meant to be public; the table's rules only allow adding and reading scores.
 
 ## License
-Code: MIT. Map data: © OpenStreetMap contributors (ODbL). Elevation: USGS 3DEP (public domain).
+Code: MIT. Map data: © OpenStreetMap contributors (ODbL). Elevation: USGS 3DEP (public domain). Sounds: Freesound recordings under CC0 (public domain); see [data/sounds/CREDITS.md](data/sounds/CREDITS.md).
