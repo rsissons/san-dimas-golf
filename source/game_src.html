@@ -852,14 +852,17 @@ function buildTerrain() {
   floor.position.y = base - 160; scene.add(floor);
 }
 
-// Pond fountains (course style "fountains"): a jet in the middle of each pond, spray falling back, a ripple
+// Pond fountains (course style "fountains": true for every pond, or a list of hole numbers for the ponds by
+// those holes): a jet in the middle of each pond, spray falling back, a ripple
 // ring at the base. Scenery only; the pond plays as water as always.
 const ponds = [], fountains = [];
 function buildFountains() {
   if (!STYLE.fountains) return;
   const area = r => Math.abs(r.reduce((a, p, i) => a + p[0] * r[(i + 1) % r.length][1] - r[(i + 1) % r.length][0] * p[1], 0)) / 2;
+  const holeOfPond = r => { const c = centroid(r); let best = null; for (const h of HOLES) for (let i = 0; i < h.line.length - 1; i++) { const d = segDist(c[0], c[1], h.line[i], h.line[i + 1]); if (!best || d < best.d) best = { d, n: h.n }; } return best.n; };
   for (const pd of ponds) {
     const A = area(pd.ring); if (A < 600) continue;
+    if (Array.isArray(STYLE.fountains) && !STYLE.fountains.includes(holeOfPond(pd.ring))) continue;
     // The spot farthest from the banks
     const xs = pd.ring.map(p => p[0]), ys = pd.ring.map(p => p[1]);
     let best = null;
@@ -2123,7 +2126,7 @@ function boot(hot) {
   else showLobby();
   window.claude?.hot?.snapshot?.(() => ({ started: game.phase !== 'menu', mode: game.mode, day: game.day, seq: game.seq, si: game.si, tee: game.tee, level: game.level, scores: game.scores }));
   requestAnimationFrame(frame);
-  window.__golf = { POWER, COURSE, parOf, arroyoAt, game, hit, caddie, newAddress, HOLE_FW, F, CLIPS, clip, sfx, audio, defaultAim, world, surface, height, HOLES, CLUBS, carryTable: () => carryTable, trees, startHole, beginRound, dailyHoles, P, API, showLobby };
+  window.__golf = { scene, POWER, COURSE, parOf, arroyoAt, game, hit, caddie, newAddress, HOLE_FW, F, CLIPS, clip, sfx, audio, defaultAim, world, surface, height, HOLES, CLUBS, carryTable: () => carryTable, trees, startHole, beginRound, dailyHoles, P, API, showLobby };
 }
 const start = data => { try { boot(data); } catch (err) { $('loading').textContent = 'Could not start: ' + err.message; throw err; } };
 window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
