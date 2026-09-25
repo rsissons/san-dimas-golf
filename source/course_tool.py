@@ -51,6 +51,10 @@ def fetch(cfg, raw):
     s, w, n, e = min(lats), min(lons), max(lats), max(lons)
     if not os.path.exists(os.path.join(raw, 'frame.json')):
         save(os.path.join(raw, 'frame.json'), {'lat0': round((s + n) / 2, 6), 'lon0': round((w + e) / 2, 6), 'bbox': [s, w, n, e]})
+    if not os.path.exists(os.path.join(raw, 'power.json')):
+        pad = 0.006
+        save(os.path.join(raw, 'power.json'), overpass(f'[out:json][timeout:120];(nwr[power]({s - pad},{w - pad},{n + pad},{e + pad}););out geom;'))
+        print('power.json saved', flush=True)
     if not os.path.exists(os.path.join(raw, 'osm2.json')):
         pad = 0.004
         bb = f'{s - pad},{w - pad},{n + pad},{e + pad}'
@@ -275,35 +279,73 @@ def place_landmarks(cfg, c, holes):
     the fairway". Each landmark: hole, kind (tree | box), from (a tee colour, or "green" for the green's front
     edge), yards, and across (-1 left edge of the fairway, 0 middle, +1 right edge, looking at the green)."""
     out = []
-    for lm in cfg.get('landmarks', []):
-        h = holes[lm['hole'] - 1]; line = h['line']; pin = line[-1]
-        if lm['from'] == 'green':
-            g = next((gr['o'] for gr in c['features']['green'] if inside(pin, gr['o'])), None)
-            front = 0.0
-            while g and front < 80 and inside(along_from_pin(line, front), g): front += 0.5
-            back = front + lm['yards'] * YD
-        else:
-            back = path_to_pin(h['tees'][lm['from']], line) - lm['yards'] * YD
-        p = along_from_pin(line, back); q = along_from_pin(line, back + 2)
-        dx, dy = p[0] - q[0], p[1] - q[1]; L = math.hypot(dx, dy) or 1
-        nl = (-dy / L, dx / L)                                   # to the left, looking at the green
-        fws = [f['o'] for f in c['features']['fairway']]
-        onfw = lambda t: any(inside((p[0] + nl[0] * t, p[1] + nl[1] * t), f) for f in fws)
-        left = right = None
-        if onfw(0):
-            left = 0.0
-            while left < 60 and onfw(left + 0.5): left += 0.5
-            right = 0.0
-            while right < 60 and onfw(-(right + 0.5)): right += 0.5
-            mid = (left - right) / 2; half = (left + right) / 2
-            t = mid - lm.get('across', 0) * half
-        else:
-            t = -lm.get('across', 0) * 15                          # no fairway there: 15 m either side of the line
-        pos = [round(p[0] + nl[0] * t, 1), round(p[1] + nl[1] * t, 1)]
-        out.append({'hole': lm['hole'], 'kind': lm['kind'], 'x': pos[0], 'y': pos[1], 'note': lm.get('note', '')})
-        print(f"landmark hole {lm['hole']} {lm['kind']}: {lm['yards']} yd from {lm['from']}, across {lm.get('across', 0)}"
-              f" -> {round(path_to_pin(pos, line) / YD)} yd to the pin" + (f", fairway {round((left + right) / YD)} yd wide there" if left is not None else ', not on a fairway'))
+    for gi, lm0 in enumerate(cfg.get('landmarks', [])):
+        for yards in (lm0['yards'] if isinstance(lm0['yards'], list) else [lm0['yards']]):
+            lm = {**lm0, 'yards': yards}
+            h = holes[lm['hole'] - 1]; line = h['line']; pin = line[-1]
+            if lm['from'] == 'green':
+                g = next((gr['o'] for gr in c['features']['green'] if inside(pin, gr['o'])), None)
+                front = 0.0
+                while g and front < 80 and inside(along_from_pin(line, front), g): front += 0.5
+                back = front + lm['yards'] * YD
+            else:
+                back = path_to_pin(h['tees'][lm['from']], line) - lm['yards'] * YD
+            p = along_from_pin(line, back); q = along_from_pin(line, back + 2)
+            dx, dy = p[0] - q[0], p[1] - q[1]; L = math.hypot(dx, dy) or 1
+            nl = (-dy / L, dx / L)                                   # to the left, looking at the green
+            fws = [f['o'] for f in c['features']['fairway']]
+            onfw = lambda t: any(inside((p[0] + nl[0] * t, p[1] + nl[1] * t), f) for f in fws)
+            left = right = None
+            if onfw(0):
+                left = 0.0
+                while left < 60 and onfw(left + 0.5): left += 0.5
+                right = 0.0
+                while right < 60 and onfw(-(right + 0.5)): right += 0.5
+                mid = (left - right) / 2; half = (left + right) / 2
+                t = mid - lm.get('across', 0) * half
+            else:
+                t = -lm.get('across', 0) * 15                          # no fairway there: 15 m either side of the line
+            if left is not None and abs(lm.get('across', 0)) > 1:          # past the fairway edge: measure from the edge
+                edge = left if lm['across'] < 0 else -right
+                t = edge - (lm['across'] - (1 if lm['across'] > 0 else -1)) * half
+            pos = [round(p[0] + nl[0] * t, 1), round(p[1] + nl[1] * t, 1)]
+            out.append({'hole': lm['hole'], 'kind': lm['kind'], 'x': pos[0], 'y': pos[1], 'group': gi, 'note': lm.get('note', '')})
+            print(f"landmark hole {lm['hole']} {lm['kind']}: {lm['yards']} yd from {lm['from']}, across {lm.get('across', 0)}"
+                  f" -> {round(path_to_pin(pos, line) / YD)} yd to the pin" + (f", fairway {round((left + right) / YD)} yd wide there" if left is not None else ', not on a fairway'))
     return out
+
+
+def power_lines(raw, lat0, lon0, dem, landmarks):
+    """Transmission towers and their spans from OpenStreetMap (raw/power.json), plus wooden poles placed as
+    landmarks (wired pole to pole). Kept within about 2 km of the course."""
+    mx = math.cos(math.radians(lat0)) * M
+    P = lambda la, lo: [round((lo - lon0) * mx, 1), round((la - lat0) * M, 1)]
+    cx = dem['x0'] + (dem['nx'] - 1) * dem['step'] / 2; cy = dem['y0'] + (dem['ny'] - 1) * dem['step'] / 2
+    near = lambda p: math.hypot(p[0] - cx, p[1] - cy) < 2200
+    towers, poles, spans = {}, {}, []
+    path = os.path.join(raw, 'power.json')
+    if os.path.exists(path):
+        E = load(path)['elements']
+        for e in E:
+            if e['type'] == 'node' and e.get('tags', {}).get('power') in ('tower', 'pole'):
+                p = P(e['lat'], e['lon'])
+                if near(p): (towers if e['tags']['power'] == 'tower' else poles)[e['id']] = p
+        for e in E:
+            t = e.get('tags', {})
+            if e['type'] != 'way' or t.get('power') not in ('line', 'minor_line'): continue
+            sup = [n for n in e['nodes'] if n in towers or n in poles]
+            for a, b in zip(sup, sup[1:]):
+                pa = towers.get(a) or poles.get(a); pb = towers.get(b) or poles.get(b)
+                spans.append({'a': pa, 'b': pb, 'kind': 'tower' if a in towers and b in towers else 'pole'})
+    by_group = collections.defaultdict(list)
+    for lm in landmarks:
+        if lm['kind'] == 'pole': by_group[lm['group']].append([lm['x'], lm['y']])
+    lm_poles = [p for g in by_group.values() for p in g]
+    for g in by_group.values():
+        for a, b in zip(g, g[1:]): spans.append({'a': a, 'b': b, 'kind': 'pole'})
+    if not (towers or poles or lm_poles): return None
+    print('power:', len(towers), 'towers,', len(poles) + len(lm_poles), 'poles,', len(spans), 'spans')
+    return {'towers': list(towers.values()), 'poles': list(poles.values()) + lm_poles, 'spans': spans}
 
 
 def arroyo_grid(dem, boundary, min_depth=2.5, min_cells=12, radius=6):
@@ -397,7 +439,9 @@ def package(cfg, raw, out_dir):
             'holes': holes, 'dem': pack_grid(dem, 0.01), 'bg': pack_grid(bg, 0.1)}
     if arroyo: data['arroyo'] = arroyo
     marks = place_landmarks(cfg, c, holes)
-    if marks: data['landmarks'] = marks
+    if marks: data['landmarks'] = [m for m in marks if m['kind'] != 'pole']
+    power = power_lines(raw, c['origin'][0], c['origin'][1], dem, marks)
+    if power: data['power'] = power
     js = 'window.COURSE = ' + json.dumps(data, separators=(',', ':')) + ';\n'
     open(os.path.join(out_dir, 'data.js'), 'w', encoding='utf-8').write(js)
     print('data.js', round(len(js) / 1024), 'KB')

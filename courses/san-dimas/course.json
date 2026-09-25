@@ -25,7 +25,8 @@
   "style": { "treeSeed": 91773, "treeGrid": 7, "treeChance": 0.5, "clearLine": 20, "clearRough": 7, "dryRough": 0.3 },
   "landmarks": [
     { "hole": 4, "kind": "box", "from": "white", "yards": 220, "across": -0.45, "note": "Electrical box, left-center of the fairway (Ron, 2026-09-25)" },
-    { "hole": 4, "kind": "tree", "from": "green", "yards": 60, "across": 0, "note": "Tree in the middle of the fairway, about 60 yd short of the green (Ron, 2026-09-25)" }
+    { "hole": 4, "kind": "tree", "from": "green", "yards": 60, "across": 0, "note": "Tree in the middle of the fairway, about 60 yd short of the green (Ron, 2026-09-25)" },
+    { "hole": 4, "kind": "pole", "from": "white", "yards": [110, 185, 260, 335], "across": 1.3, "note": "Wooden power poles in the trees down the right side (Ron's flyover photo, 2026-09-25)" }
   ],
   "source": "Scorecard: Documents\\SanDimas-Scorecard-2021-print.pdf"
 }

@@ -312,7 +312,7 @@
   <div id="loading">Building the course…</div>
 </div>
 
-<script>window.COURSES = [{"id": "san-dimas", "title": "San Dimas Canyon", "short": "San Dimas", "city": "San Dimas", "v": "9347fcb399"}, {"id": "marshall-canyon", "title": "Marshall Canyon", "short": "Marshall Canyon", "city": "La Verne", "v": "41266d5694"}];</script>
+<script>window.COURSES = [{"id": "san-dimas", "title": "San Dimas Canyon", "short": "San Dimas", "city": "San Dimas", "v": "6a643b3427"}, {"id": "marshall-canyon", "title": "Marshall Canyon", "short": "Marshall Canyon", "city": "La Verne", "v": "41266d5694"}];</script>
 <script>// Golf ball physics: flight (drag, Magnus lift, spin decay, wind), impacts with spin-aware friction,
 // rolling with slope and rolling resistance, trees, and the cup. World units are metres, z up.
 const GolfPhysics = (() => {
@@ -778,6 +778,26 @@ for (const lm of (COURSE.landmarks || [])) {
   if (!treeGrid.has(key)) treeGrid.set(key, []);
   treeGrid.get(key).push(t);
 }
+// Power lines: transmission towers (from OpenStreetMap) and wooden poles. Each tower's four legs and each pole
+// are solid; the wires overhead are scenery only.
+const POWER = COURSE.power || null;
+const TOWER = { h: 44, base: 4.4, waist: 1.3, arms: [[31, 6.8], [36.5, 4.8], [42, 6.8]] };
+const towerDir = t => {                                   // each tower faces along its line (average of its spans)
+  let dx = 0, dy = 0;
+  for (const sp of POWER.spans) if (sp.kind === 'tower' && (dist2(sp.a, t) < 1 || dist2(sp.b, t) < 1)) { const d = dist2(sp.a, sp.b) || 1; dx += (sp.b[0] - sp.a[0]) / d; dy += (sp.b[1] - sp.a[1]) / d; }
+  return Math.atan2(dy, dx) || 0;
+};
+if (POWER) {
+  const add = t => { trees.push(t); const key = Math.floor(t.x / TG) + ',' + Math.floor(t.y / TG); if (!treeGrid.has(key)) treeGrid.set(key, []); treeGrid.get(key).push(t); };
+  for (const tw of POWER.towers) {
+    const a = towerDir(tw), ux = Math.cos(a), uy = Math.sin(a);
+    for (const [sx, sy] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+      const x = tw[0] + (ux * sx - uy * sy) * TOWER.base, y = tw[1] + (uy * sx + ux * sy) * TOWER.base;
+      add({ x, y, base: height(x, y), trunk: 18, tr: 0.35, rx: 0.01, rz: 0.01, cz: -1e4, dens: 0, kind: 'leg', hgt: 18, shade: 0 });
+    }
+  }
+  for (const pl of POWER.poles) add({ x: pl[0], y: pl[1], base: height(pl[0], pl[1]), trunk: 11, tr: 0.16, rx: 0.01, rz: 0.01, cz: -1e4, dens: 0, kind: 'pole', hgt: 11, shade: 0 });
+}
 function treeAt(x, y) {
   const gx = Math.floor(x / TG), gy = Math.floor(y / TG), out = [];
   for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) { const a = treeGrid.get((gx + i) + ',' + (gy + j)); if (a) for (const t of a) if (Math.abs(t.x - x) < t.rx + 1 && Math.abs(t.y - y) < t.rx + 1) out.push(t); }
@@ -1036,7 +1056,7 @@ function buildTrees() {
   const trunks = new THREE.InstancedMesh(trunkGeo, new THREE.MeshLambertMaterial({ color: '#6e5039' }), Math.max(1, trees.length));
   trunks.castShadow = true;
   const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s3 = new THREE.Vector3(), col = new THREE.Color();
-  trees.forEach((t, i) => { m.compose(toV(t.x, t.y, t.base - 0.3), q, t.kind === 'box' ? s3.set(0, 0, 0) : s3.set(t.kind === 'oak' ? 1.4 : 1, t.trunk + 0.6, t.kind === 'oak' ? 1.4 : 1)); trunks.setMatrixAt(i, m); });
+  trees.forEach((t, i) => { m.compose(toV(t.x, t.y, t.base - 0.3), q, t.kind === 'box' || t.kind === 'leg' || t.kind === 'pole' ? s3.set(0, 0, 0) : s3.set(t.kind === 'oak' ? 1.4 : 1, t.trunk + 0.6, t.kind === 'oak' ? 1.4 : 1)); trunks.setMatrixAt(i, m); });
   // Utility boxes: a green-painted metal cabinet on a small concrete pad (as in the San Dimas hole 4 flyover)
   for (const t of trees.filter(tr => tr.kind === 'box')) {
     const bx = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.2, 0.9).translate(0, 0.6, 0), new THREE.MeshLambertMaterial({ color: '#2f5d43' }));
@@ -1048,7 +1068,7 @@ function buildTrees() {
   // Broadleaf canopies: two or three soft blobs per tree, each a little different in size, height and shade
   const blobs = [];
   for (const t of trees) {
-    if (t.kind === 'pine' || t.kind === 'box') continue;
+    if (t.kind === 'pine' || t.kind === 'box' || t.kind === 'leg' || t.kind === 'pole') continue;
     const r = seeded(Math.floor((t.x * 73856093) ^ (t.y * 19349663)));
     const n = t.kind === 'oak' || t.kind === 'scrub' ? 3 : 2;
     for (let k = 0; k < n; k++) {
@@ -1076,6 +1096,88 @@ function buildTrees() {
     }
     scene.add(pm);
   }
+}
+
+function buildPower() {
+  if (!POWER) return;
+  const up = new THREE.Vector3(0, 1, 0), m = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3();
+  // Every steel member is one instanced thin cylinder between two points
+  const members = [];
+  const beam = (a, b, r) => members.push([a, b, r]);
+  const tips = new Map();                                  // wire attachment points per tower
+  for (const tw of POWER.towers) {
+    const a = towerDir(tw), ux = Math.cos(a), uy = Math.sin(a), g = height(tw[0], tw[1]) - 0.5;
+    // Local frame: u along the line, v across it; w(z) is the half-width at height z (a tapering square)
+    const P = (u, v, z) => toV(tw[0] + ux * u - uy * v, tw[1] + uy * u + ux * v, g + z);
+    const w = z => z < 28 ? TOWER.base + (TOWER.waist - TOWER.base) * (z / 28) : TOWER.waist;
+    const lv = [0, 7, 14, 21, 28, 34, 39.5, 44];
+    const corners = [[1, 1], [1, -1], [-1, -1], [-1, 1]];
+    for (let i = 0; i < lv.length - 1; i++) {
+      const z0 = lv[i], z1 = lv[i + 1];
+      for (let c = 0; c < 4; c++) {
+        const [su, sv] = corners[c], [nu, nv] = corners[(c + 1) % 4];
+        beam(P(su * w(z0), sv * w(z0), z0), P(su * w(z1), sv * w(z1), z1), 0.16);                     // leg
+        beam(P(su * w(z1), sv * w(z1), z1), P(nu * w(z1), nv * w(z1), z1), 0.07);                     // girt
+        beam(P(su * w(z0), sv * w(z0), z0), P(nu * w(z1), nv * w(z1), z1), 0.05);                     // X bracing
+        beam(P(nu * w(z0), nv * w(z0), z0), P(su * w(z1), sv * w(z1), z1), 0.05);
+      }
+    }
+    const pts = [];
+    for (const [z, span] of TOWER.arms) {
+      for (const s2 of [1, -1]) {
+        beam(P(0, s2 * TOWER.waist, z), P(0, s2 * span, z), 0.12);
+        beam(P(0, s2 * TOWER.waist, z + 2.2), P(0, s2 * span, z), 0.06);
+        pts.push([tw[0] - uy * s2 * span, tw[1] + ux * s2 * span, g + z - 1.6]);                     // insulator hangs below the arm
+      }
+    }
+    pts.push([tw[0], tw[1], g + TOWER.h + 1]);                                                         // shield wire on the peak
+    beam(P(0, 0, 44), P(0, 0, 46), 0.1);
+    tips.set(tw[0] + ',' + tw[1], { pts, u: [ux, uy] });
+  }
+  const cyl = new THREE.InstancedMesh(new THREE.CylinderGeometry(1, 1, 1, 5), new THREE.MeshLambertMaterial({ color: '#9aa0a4' }), Math.max(1, members.length));
+  members.forEach(([a, b, r], i) => {
+    const d = new THREE.Vector3().subVectors(b, a), len = d.length() || 1e-3;
+    q.setFromUnitVectors(up, d.clone().normalize()); sc.set(r, len, r);
+    m.compose(a.clone().add(b).multiplyScalar(0.5), q, sc); cyl.setMatrixAt(i, m);
+  });
+  cyl.castShadow = true; scene.add(cyl);
+  // Wooden poles with a crossarm
+  const poleTips = new Map();
+  const poleMesh = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.13, 0.17, 1, 7).translate(0, 0.5, 0), new THREE.MeshLambertMaterial({ color: '#6d5238' }), Math.max(1, POWER.poles.length * 2));
+  let k = 0;
+  const armAngle = pl => { let best = 0, bd = Infinity; for (const sp of POWER.spans) { if (sp.kind !== 'pole') continue; for (const [p1, p2] of [[sp.a, sp.b], [sp.b, sp.a]]) if (dist2(p1, pl) < 1 && dist2(p1, p2) < bd) { bd = dist2(p1, p2); best = Math.atan2(p2[1] - p1[1], p2[0] - p1[0]); } } return best; };
+  for (const pl of POWER.poles) {
+    const g = height(pl[0], pl[1]) - 0.3, a = armAngle(pl), ux = Math.cos(a), uy = Math.sin(a);
+    m.compose(toV(pl[0], pl[1], g), q.identity(), sc.set(1, 11.3, 1)); poleMesh.setMatrixAt(k++, m);
+    // crossarm across the line
+    const e = new THREE.Euler(0, Math.atan2(ux, uy), Math.PI / 2);
+    m.compose(toV(pl[0], pl[1], g + 10.4), q.setFromEuler(e), sc.set(0.9, 2.4, 0.9)); poleMesh.setMatrixAt(k++, m);
+    poleTips.set(pl[0] + ',' + pl[1], [-1, 0, 1].map(o => [pl[0] - uy * o * 1.05, pl[1] + ux * o * 1.05, g + 10.6]));
+  }
+  poleMesh.count = k; poleMesh.castShadow = true; scene.add(poleMesh);
+  // Wires: a catenary-like sag between matching attachment points
+  const seg = [];
+  const drape = (a, b, sag) => {
+    const n = 24; let prev = null;
+    for (let i = 0; i <= n; i++) {
+      const t = i / n, x = a[0] + (b[0] - a[0]) * t, y = a[1] + (b[1] - a[1]) * t, z = a[2] + (b[2] - a[2]) * t - sag * 4 * t * (1 - t);
+      const v = toV(x, y, z); if (prev) seg.push(prev.x, prev.y, prev.z, v.x, v.y, v.z); prev = v;
+    }
+  };
+  for (const sp of POWER.spans) {
+    const len = dist2(sp.a, sp.b);
+    if (sp.kind === 'tower') {
+      const A = tips.get(sp.a[0] + ',' + sp.a[1]), B = tips.get(sp.b[0] + ',' + sp.b[1]); if (!A || !B) continue;
+      // Pair each attachment with the nearest one on the next tower (the towers may face either way along the line)
+      for (const pa of A.pts) { let best = null; for (const pb of B.pts) if (Math.abs(pb[2] - pa[2]) < 3 && (!best || Math.hypot(pb[0] - pa[0], pb[1] - pa[1]) < Math.hypot(best[0] - pa[0], best[1] - pa[1]))) best = pb; if (best) drape(pa, best, len * 0.035); }
+    } else {
+      const A = poleTips.get(sp.a[0] + ',' + sp.a[1]), B = poleTips.get(sp.b[0] + ',' + sp.b[1]); if (!A || !B) continue;
+      for (const pa of A) { let best = B[0]; for (const pb of B) if (Math.hypot(pb[0] - pa[0], pb[1] - pa[1]) < Math.hypot(best[0] - pa[0], best[1] - pa[1])) best = pb; drape(pa, best, len * 0.02); }
+    }
+  }
+  const wg = new THREE.BufferGeometry(); wg.setAttribute('position', new THREE.Float32BufferAttribute(seg, 3));
+  const wires = new THREE.LineSegments(wg, new THREE.LineBasicMaterial({ color: '#3b4146', transparent: true, opacity: 0.85 }));
+  wires.frustumCulled = false; scene.add(wires);
 }
 
 function buildBuildings() {
@@ -1501,6 +1603,10 @@ function drawHole(g, T, w, h, pinP, bg) {
   arroyoCells((x0, y0, st) => { const v = arroyoAt(x0 + st / 2, y0 + st / 2); if (v <= 16) return; const q = mapPt(T, [x0 + st / 2, y0 + st / 2]); if (q[0] < -8 || q[1] < -8 || q[0] > w + 8 || q[1] > h + 8) return; g.beginPath(); g.arc(q[0], q[1], Math.max(1, st * T.sc * 0.62), 0, 7); g.fill(); });
   g.strokeStyle = '#a7a194'; g.lineWidth = Math.max(1, 1.6 * T.sc);
   for (const L of (F.ditch || [])) { g.beginPath(); L.forEach((p, i) => { const q = mapPt(T, p); i ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1]); }); g.stroke(); }
+  if (POWER) {
+    g.fillStyle = '#4c5256';
+    for (const p of [...POWER.towers, ...POWER.poles]) { const q = mapPt(T, p); if (q[0] < -8 || q[1] < -8 || q[0] > w + 8 || q[1] > h + 8) continue; const r = Math.max(1.5, (POWER.towers.includes(p) ? 4.5 : 0.8) * T.sc); g.fillRect(q[0] - r, q[1] - r, r * 2, r * 2); }
+  }
   g.fillStyle = 'rgba(28,70,36,0.85)';
   for (const t of trees) { const q = mapPt(T, [t.x, t.y]); if (q[0] < -8 || q[1] < -8 || q[0] > w + 8 || q[1] > h + 8) continue; g.beginPath(); g.arc(q[0], q[1], Math.max(1.3, t.rx * T.sc * 0.8), 0, 7); g.fill(); }
   const pp = mapPt(T, pinP); g.fillStyle = '#f0643c'; g.beginPath(); g.arc(pp[0], pp[1], Math.max(3, w / 75), 0, 7); g.fill();
@@ -2148,7 +2254,7 @@ function boot(hot) {
   if (prefs) { if (TEES.some(t => t.k === prefs.tee)) game.tee = prefs.tee; game.level = prefs.level; }
   game.mute = store.get('mute', false);
   if (store.get('map', true) === false || window.innerWidth < 640 && store.get('map', null) === null) { $('mapBox').hidden = true; $('mapBtn').setAttribute('aria-pressed', 'false'); }
-  buildTerrain(); buildTrees(); buildBuildings();
+  buildTerrain(); buildTrees(); buildBuildings(); buildPower();
   buildCarryTable(LEVELS[game.level]); buildPuttTable();
   resize();
   const T = HOLES[0].tees[game.tee];
@@ -2160,7 +2266,7 @@ function boot(hot) {
   else showLobby();
   window.claude?.hot?.snapshot?.(() => ({ started: game.phase !== 'menu', mode: game.mode, day: game.day, seq: game.seq, si: game.si, tee: game.tee, level: game.level, scores: game.scores }));
   requestAnimationFrame(frame);
-  window.__golf = { COURSE, parOf, arroyoAt, game, hit, caddie, newAddress, HOLE_FW, F, CLIPS, clip, sfx, audio, defaultAim, world, surface, height, HOLES, CLUBS, carryTable: () => carryTable, trees, startHole, beginRound, dailyHoles, P, API, showLobby };
+  window.__golf = { POWER, COURSE, parOf, arroyoAt, game, hit, caddie, newAddress, HOLE_FW, F, CLIPS, clip, sfx, audio, defaultAim, world, surface, height, HOLES, CLUBS, carryTable: () => carryTable, trees, startHole, beginRound, dailyHoles, P, API, showLobby };
 }
 const start = data => { try { boot(data); } catch (err) { $('loading').textContent = 'Could not start: ' + err.message; throw err; } };
 window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
