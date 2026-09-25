@@ -2,3 +2,7 @@ supabase.json
 san-dimas-canyon-18.html
 source/game_src.v2.html
 __pycache__/
+node_modules/
+test_site/
+courses/*/raw/*_parts/
+*.png

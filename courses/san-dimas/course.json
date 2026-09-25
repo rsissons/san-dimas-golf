@@ -1,0 +1,31 @@
+{
+  "id": "san-dimas",
+  "name": "San Dimas Canyon Golf Course",
+  "title": "San Dimas Canyon",
+  "short": "San Dimas",
+  "city": "San Dimas",
+  "osm": { "name": "San Dimas Canyon Golf Course" },
+  "tees": [
+    { "k": "blue", "n": "Blue", "c": "#2f63d6", "hcp": "hcp" },
+    { "k": "white", "n": "White", "c": "#f4f4f4", "hcp": "hcp" },
+    { "k": "red", "n": "Red", "c": "#e0413c", "hcp": "hcpRed" }
+  ],
+  "dailyTee": "white",
+  "card": {
+    "par": [4, 3, 5, 4, 3, 5, 3, 4, 5, 3, 4, 5, 4, 4, 4, 3, 5, 4],
+    "hcp": [9, 17, 5, 1, 3, 15, 7, 11, 13, 16, 8, 14, 6, 2, 10, 12, 18, 4],
+    "hcpRed": [11, 13, 1, 7, 15, 5, 17, 9, 3, 18, 12, 2, 6, 4, 10, 16, 8, 14],
+    "yards": {
+      "blue": [341, 145, 552, 393, 208, 452, 209, 351, 472, 198, 377, 462, 413, 416, 380, 178, 461, 392],
+      "white": [323, 131, 523, 367, 176, 440, 181, 334, 449, 173, 351, 433, 394, 377, 362, 161, 446, 383],
+      "red": [300, 115, 483, 339, 139, 417, 120, 304, 413, 149, 332, 395, 337, 310, 353, 112, 428, 329]
+    }
+  },
+  "rating": { "blue": "71.7 / 126", "white": "M 70.0 / 122 · W 75.2 / 132", "red": "M 66.5 / 109 · W 72.5 / 128" },
+  "style": { "treeSeed": 91773, "treeGrid": 7, "treeChance": 0.5, "clearLine": 20, "clearRough": 7, "dryRough": 0.3 },
+  "landmarks": [
+    { "hole": 4, "kind": "box", "from": "white", "yards": 220, "across": -0.45, "note": "Electrical box, left-center of the fairway (Ron, 2026-09-25)" },
+    { "hole": 4, "kind": "tree", "from": "green", "yards": 60, "across": 0, "note": "Tree in the middle of the fairway, about 60 yd short of the green (Ron, 2026-09-25)" }
+  ],
+  "source": "Scorecard: Documents\\SanDimas-Scorecard-2021-print.pdf"
+}

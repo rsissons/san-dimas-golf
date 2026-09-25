@@ -1,0 +1,8 @@
+{
+  "name": "canyon-golf",
+  "private": true,
+  "description": "Test tools for the golf game (the game itself needs no build step beyond python source/build.py)",
+  "devDependencies": {
+    "puppeteer-core": "^23.11.1"
+  }
+}

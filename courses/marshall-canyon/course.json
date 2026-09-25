@@ -1,0 +1,30 @@
+{
+  "id": "marshall-canyon",
+  "name": "Marshall Canyon Golf Course",
+  "title": "Marshall Canyon",
+  "short": "Marshall Canyon",
+  "city": "La Verne",
+  "osm": { "way": 305803592 },
+  "tees": [
+    { "k": "blue", "n": "Blue", "c": "#2f63d6", "hcp": "hcp" },
+    { "k": "white", "n": "White", "c": "#f4f4f4", "hcp": "hcp" },
+    { "k": "red", "n": "Red", "c": "#e0413c", "hcp": "hcpRed" },
+    { "k": "gold", "n": "Gold", "c": "#e8c14a", "hcp": "hcpRed" }
+  ],
+  "dailyTee": "white",
+  "card": {
+    "par": [5, 3, 4, 4, 4, 4, 3, 4, 4, 5, 3, 4, 4, 4, 4, 3, 5, 4],
+    "parBy": { "red": { "5": 5, "13": 5 }, "gold": { "5": 5, "13": 5 } },
+    "hcp": [11, 17, 3, 5, 1, 13, 9, 15, 7, 6, 18, 14, 2, 10, 8, 16, 12, 4],
+    "hcpRed": [3, 17, 7, 1, 11, 13, 5, 15, 9, 2, 16, 12, 4, 8, 10, 18, 6, 14],
+    "yards": {
+      "blue": [466, 168, 344, 364, 416, 317, 200, 299, 369, 481, 174, 317, 426, 351, 384, 185, 457, 409],
+      "white": [457, 144, 328, 353, 405, 311, 182, 292, 350, 467, 156, 303, 414, 342, 358, 159, 447, 384],
+      "red": [446, 142, 308, 351, 397, 302, 126, 286, 340, 457, 137, 292, 409, 333, 346, 112, 407, 325],
+      "gold": [446, 91, 308, 351, 397, 302, 126, 286, 340, 457, 51, 200, 316, 333, 346, 92, 407, 325]
+    }
+  },
+  "rating": { "blue": "M 69.8 / 123", "white": "M 68.5 / 120", "red": "M 66.8 / 116", "gold": "M 65.2 / 112" },
+  "style": { "treeSeed": 60073, "treeGrid": 6, "treeChance": 0.82, "clearLine": 15, "clearRough": 5, "dryRough": 0.55, "arroyos": true, "ditches": true },
+  "source": "Scorecard: Ron's PDF, 2026-09-25 (Blue/White par 71, Red/Gold par 73). Women's ratings were cut off in the scan."
+}

@@ -2,11 +2,12 @@
 window.__log = [];
 window.addEventListener('error', e => window.__log.push('ERROR ' + e.message + ' @' + e.lineno));
 try { localStorage.setItem('sdc18:name', JSON.stringify('Test Bot')); } catch {}
-setTimeout(function run() {
-  const G = window.__golf; if (!G) { window.__log.push('no __golf'); return; }
+(function wait(t0) { if (!window.__golf) { if (Date.now() - t0 > 60000) { window.__log.push('no __golf'); window.__done = true; return; } setTimeout(() => wait(t0), 200); return; } setTimeout(run, 800); })(Date.now());
+function run() {
+  const G = window.__golf;
   const mode = (location.hash || '#round').slice(1);
   if (mode === 'daily') document.getElementById('chPlay').click();
-  else G.beginRound({ mode: 'round', day: G.game.day, seq: [...G.HOLES.keys()], tee: 'white', level: 2 });
+  else G.beginRound({ mode: 'round', day: G.game.day, seq: [...G.HOLES.keys()], tee: (new URLSearchParams(location.search).get('tee') || 'white'), level: 2 });
   G.game.timeScale = 25; G.game.noRender = true;
   let shots = 0, holeShots = [];
   const tick = () => {
@@ -16,7 +17,7 @@ setTimeout(function run() {
     if (!document.getElementById('scoreSheet').hidden) {
       const res = !document.getElementById('resultBox').hidden;
       if (res) { window.__log.push('RESULT ' + document.getElementById('resultBig').textContent + ' | ' + document.getElementById('resultSub').textContent); window.__done = true; return; }
-      window.__log.push(`hole ${G.HOLES[g.hole].n}: ${g.scores[g.hole]} (par ${G.HOLES[g.hole].par}) ${holeShots.join(' | ')}`);
+      window.__log.push(`hole ${G.HOLES[g.hole].n}: ${g.scores[g.hole]} (par ${G.parOf(G.HOLES[g.hole])}) ${holeShots.join(' | ')}`);
       holeShots = [];
       document.querySelector('#scButtons .btnGo').click();
     } else if (g.phase === 'address') {
@@ -31,4 +32,4 @@ setTimeout(function run() {
     setTimeout(tick, 60);
   };
   tick();
-}, 1500);
+}

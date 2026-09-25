@@ -7,7 +7,7 @@ const GolfPhysics = (() => {
   const CUP_R = 0.054;
 
   // Surface codes shared with the lie map
-  const S = { OB: 0, ROUGH: 1, FAIRWAY: 2, GREEN: 3, FRINGE: 4, TEE: 5, BUNKER: 6, WATER: 7, PATH: 8, NATIVE: 9 };
+  const S = { OB: 0, ROUGH: 1, FAIRWAY: 2, GREEN: 3, FRINGE: 4, TEE: 5, BUNKER: 6, WATER: 7, PATH: 8, NATIVE: 9, ARROYO: 10 };
   // e: restitution, mu: impact friction, roll: rolling resistance (× g), hold: extra static friction on slopes
   const SURF = {
     [S.OB]:      { name: 'Out of bounds', e: 0.18, mu: 0.55, roll: 0.40, hold: 1.6, soft: 0.5, drag: 0.3 },
@@ -20,7 +20,10 @@ const GolfPhysics = (() => {
     [S.WATER]:   { name: 'Water',         e: 0, mu: 1, roll: 5, hold: 5, soft: 2 },
     [S.PATH]:    { name: 'Cart path',     e: 0.58, mu: 0.30, roll: 0.035, hold: 1.2, soft: 0.05 },
     [S.NATIVE]:  { name: 'Native area',   e: 0.12, mu: 0.60, roll: 0.60, hold: 2.5, soft: 0.7, drag: 0.4 },
+    [S.ARROYO]:  { name: 'Arroyo',        e: 0, mu: 1, roll: 5, hold: 5, soft: 2 },
   };
+  // Hazards: the ball is gone (water) or unplayable in the brush (a dry arroyo); both play as a penalty and a drop
+  const HAZARD = sc => sc === S.WATER || sc === S.ARROYO;
 
   const v3 = (x, y, z) => ({ x, y, z });
   const dot = (a, b) => a.x * b.x + a.y * b.y + a.z * b.z;
@@ -44,7 +47,7 @@ const GolfPhysics = (() => {
     let w = (shot.rpm || 0) * 2 * Math.PI / 60;          // backspin, rad/s
     const tilt = (shot.tilt || 0) * Math.PI / 180;        // spin-axis tilt: + curves right
     let t = 0, mode = shot.putt ? 'roll' : 'air';
-    let firstLand = null, result = 'rest', bounces = 0, hitTree = false, lastSurf = world.surface(p.x, p.y);
+    let firstLand = null, result = 'rest', bounces = 0, hitTree = false, hazard = null, lastSurf = world.surface(p.x, p.y);
     let air = 0, lipped = false;
     const rec = () => path.push([+t.toFixed(3), +p.x.toFixed(3), +p.y.toFixed(3), +p.z.toFixed(3)]);
     rec();
@@ -102,7 +105,7 @@ const GolfPhysics = (() => {
           const sc = world.surface(p.x, p.y);
           if (!firstLand) firstLand = { x: p.x, y: p.y, t, surface: sc };
           lastSurf = sc;
-          if (sc === S.WATER) { result = 'water'; rec(); break; }
+          if (HAZARD(sc)) { result = 'water'; hazard = sc; rec(); break; }
           // Direct hit in the cup
           if (world.cup && Math.hypot(p.x - world.cup.x, p.y - world.cup.y) < CUP_R + 0.02 && len(v) < 12) { result = 'holed'; rec(); break; }
           const su = SURF[sc], n = world.normal(p.x, p.y);
@@ -134,7 +137,7 @@ const GolfPhysics = (() => {
         const dt = 1 / 240;
         const sc = world.surface(p.x, p.y);
         lastSurf = sc;
-        if (sc === S.WATER) { result = 'water'; rec(); break; }
+        if (HAZARD(sc)) { result = 'water'; hazard = sc; rec(); break; }
         const su = SURF[sc], n = world.normal(p.x, p.y);
         // A rolling ball feels 5/7 of the slope's pull (the rest goes into spinning it faster)
         const gt = scale(sub(v3(0, 0, -g), scale(n, dot(v3(0, 0, -g), n))), 5 / 7);
@@ -181,7 +184,7 @@ const GolfPhysics = (() => {
     rec();
     const out = world.surface(p.x, p.y);
     if (result === 'rest' && out === S.OB) result = 'ob';
-    return { path, end: p, result, surface: out, firstLand, hitTree, airtime: air };
+    return { path, end: p, result, surface: out, firstLand, hitTree, hazard, airtime: air };
   }
 
   return { simulate, S, SURF, CUP_R, AERO, R };
