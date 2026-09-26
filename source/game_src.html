@@ -194,6 +194,19 @@
     .club { min-width: 62px; }
     .brand h1 { font-size: 23px; }
   }
+  /* Hole picker */
+  #hjGrid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
+  .hj { display: grid; gap: 2px; padding: 9px 4px; border-radius: 12px; border: 1px solid var(--edge); background: rgba(255,255,255,0.06); text-align: center; }
+  .hj .n { font-size: 20px; font-weight: 900; }
+  .hj .m { font-size: 11px; font-weight: 700; color: var(--muted); }
+  .hj .s { font-size: 12px; font-weight: 900; min-height: 15px; }
+  .hj[aria-current="true"] { background: linear-gradient(160deg, var(--go-1), var(--go-2)); border-color: transparent; color: var(--go-text); }
+  .hj[aria-current="true"] .m { color: var(--go-text); }
+  #hjWarn { margin: 0; font-size: 14px; font-weight: 800; color: var(--gold); }
+  @media (max-width: 640px) {
+    #hjGrid { grid-template-columns: repeat(3, 1fr); }
+    .hudBtn .lbl { display: none; }
+  }
   @media (prefers-reduced-motion: reduce) { #toast { transition: none; } }
 </style>
 
@@ -211,8 +224,9 @@
       </div>
     </div>
     <div id="topRight">
-      <button class="hudBtn" id="mapBtn" aria-pressed="true">⚑ Map</button>
-      <button class="hudBtn" id="cardBtn">☰ Scorecard</button>
+      <button class="hudBtn" id="mapBtn" aria-pressed="true" aria-label="Map">⚑<span class="lbl"> Map</span></button>
+      <button class="hudBtn" id="holesBtn" aria-label="Jump to a hole">⛳<span class="lbl"> Holes</span></button>
+      <button class="hudBtn" id="cardBtn" aria-label="Scorecard">☰<span class="lbl"> Scorecard</span></button>
     </div>
     <div class="glass" id="mapBox"><canvas id="minimap" width="300" height="420" aria-label="Hole map. Tap to aim."></canvas></div>
     <div class="glass" id="toast" role="status"></div>
@@ -297,6 +311,15 @@
       <div class="sc-wrap"><table class="sc" id="scTable"></table></div>
       <div id="resultBoard" hidden><div class="cap" style="margin-bottom:6px" id="resultBoardTitle">Today's leaderboard</div><ol class="board" id="resultList"></ol></div>
       <div class="row" id="scButtons"></div>
+    </div>
+  </div>
+
+  <div class="sheet" id="holesSheet" hidden>
+    <div class="dialog" role="dialog" aria-labelledby="hjTitle">
+      <div><h2 id="hjTitle">Jump to a hole</h2><p class="sub" id="hjSub"></p></div>
+      <p id="hjWarn" hidden>Jumping makes this a practice round. It won't post to the leaderboard. Your scored round stays saved, so Resume in the lobby picks it up.</p>
+      <div id="hjGrid"></div>
+      <div class="row"><button class="btnQuiet" id="hjClose">Back to the course</button></div>
     </div>
   </div>
 
@@ -1515,6 +1538,7 @@ function startHole(si, intro = true) {
   placeTeeMarkers(); minimapTransform();
   newAddress();
   saveRound();
+  $('holesBtn').hidden = game.mode === 'daily';                    // the scored daily is one attempt for everyone
   if (intro && !matchMedia('(prefers-reduced-motion: reduce)').matches) flyover(); else { fly = null; $('skip').style.display = 'none'; game.phase = 'address'; addressCamera(true); }
 }
 // Caddie for long shots: the longest club with a safe line that finishes in the fairway, even over a corner of OB
@@ -1809,8 +1833,33 @@ function showScorecard(afterHole) {
   $('scoreSheet').hidden = false;
 }
 function hideSheets() { $('scoreSheet').hidden = true; }
+// Hole picker: any hole in free play or practice. Jumping in a scored round turns it into practice,
+// so skipped or replayed holes can't reach the leaderboard; the saved scored round is left alone for Resume.
+function showHoles() {
+  $('hjSub').textContent = `${COURSE.title} · ${teeOf(game.tee).n} tees · ${game.mode === 'round' ? 'Free play' : 'Practice (not scored)'}`;
+  $('hjWarn').hidden = game.mode !== 'round';
+  const g = $('hjGrid'); g.textContent = '';
+  HOLES.forEach((h, i) => {
+    const b = document.createElement('button'); b.className = 'hj';
+    if (i === game.hole) b.setAttribute('aria-current', 'true');
+    const sc = game.scores[i];
+    b.innerHTML = `<span class="n num">${h.n}</span><span class="m">Par ${parOf(h)} · ${h.yards[game.tee]}</span><span class="s num">${sc == null ? '' : sc}</span>`;
+    b.setAttribute('aria-label', `Hole ${h.n}, par ${parOf(h)}, ${h.yards[game.tee]} yards${sc == null ? '' : ', scored ' + sc}`);
+    b.onclick = () => jumpTo(i);
+    g.appendChild(b);
+  });
+  $('holesSheet').hidden = false;
+}
+function jumpTo(i) {
+  $('holesSheet').hidden = true;
+  if (game.mode === 'daily') return;
+  if (game.mode === 'round') { game.mode = 'practice'; toast('Practice round: not posted to the leaderboard', 3200); }
+  if (!game.seq.includes(i)) game.seq = [...HOLES.keys()];
+  startHole(game.seq.indexOf(i));
+}
 async function finishRound() {
-  const total = game.seq.reduce((a, i) => a + game.scores[i], 0), par = game.seq.reduce((a, i) => a + parOf(HOLES[i]), 0), rel = total - par;
+  const played = game.mode === 'practice' ? game.seq.filter(i => game.scores[i] != null) : game.seq;
+  const total = played.reduce((a, i) => a + game.scores[i], 0), par = played.reduce((a, i) => a + parOf(HOLES[i]), 0), rel = total - par;
   $('scTitle').textContent = game.mode === 'daily' ? 'Daily challenge complete' : game.mode === 'practice' ? 'Practice complete' : 'Round complete';
   $('resultBox').hidden = false;
   $('resultBig').textContent = fmtRel(rel);
@@ -1819,7 +1868,10 @@ async function finishRound() {
   const btns = $('scButtons'); btns.textContent = '';
   const back = document.createElement('button'); back.className = 'btnGo'; back.textContent = 'Back to the lobby'; back.onclick = () => { hideSheets(); showLobby(); };
   btns.appendChild(back);
-  if (game.mode === 'practice') { cstore.set('round', null); return; }
+  if (game.mode === 'practice') {                                   // practice never touches the saved scored round
+    if (played.length < game.seq.length) $('resultSub').textContent = `${total} strokes on a par ${par}, over the ${played.length} holes you played.`;
+    return;
+  }
   const row = { course: COURSE.id, player: store.get('name', 'Player'), mode: game.mode, day: game.mode === 'daily' ? game.day : ptDay(), tees: game.tee, level: LEVELS[game.level].k, strokes: total, par, holes: game.seq.map(i => game.scores[i]), client_id: clientId() };
   if (game.mode === 'daily') cstore.set('daily:' + game.day, { scores: game.scores, si: game.si, done: true, total, rel });
   else { cstore.set('round', null); const best = cstore.get('best', null); if (!best || total < best.strokes) cstore.set('best', { strokes: total, par, tees: game.tee, day: row.day }); }
@@ -1989,7 +2041,9 @@ $('boardMore').onclick = () => { lobby.full = true; refreshBoards(); };
 // ---------------------------------------------------------------- In-game input
 $('skip').onclick = () => { if (game.phase === 'flyover') endFlyover(); };
 $('cardBtn').onclick = () => { if (game.phase === 'address' || game.phase === 'flyover') { if (game.phase === 'flyover') endFlyover(); showScorecard(false); } };
-$('mapBtn').onclick = () => { const box = $('mapBox'); box.hidden = !box.hidden; $('mapBtn').setAttribute('aria-pressed', String(!box.hidden)); store.set('map', !box.hidden); drawMinimap(); };
+$('holesBtn').onclick = () => { if (game.mode === 'daily') return; if (game.phase === 'address' || game.phase === 'flyover') { if (game.phase === 'flyover') endFlyover(); showHoles(); } };
+$('hjClose').onclick = () => { $('holesSheet').hidden = true; };
+$('mapBtn').onclick =() => { const box = $('mapBox'); box.hidden = !box.hidden; $('mapBtn').setAttribute('aria-pressed', String(!box.hidden)); store.set('map', !box.hidden); drawMinimap(); };
 const bump = (key, d, n) => { if (game.phase !== 'address') return; game[key] = Math.max(0, Math.min(n - 1, game[key] + d)); updateHud(); };
 $('shapeL').onclick = () => bump('shape', -1, 3); $('shapeR').onclick = () => bump('shape', 1, 3);
 $('trajD').onclick = () => bump('traj', -1, 3); $('trajU').onclick = () => bump('traj', 1, 3);
@@ -2055,7 +2109,8 @@ window.addEventListener('pointerup', e => {
 });
 window.addEventListener('pointercancel', e => { if (pull && e.pointerId === pull.id) cancelPull(); drag = null; });
 window.addEventListener('keydown', e => {
-  if ($('hud').hidden || !$('scoreSheet').hidden || !$('nameSheet').hidden) return;
+  if (!$('holesSheet').hidden && e.code === 'Escape') { $('holesSheet').hidden = true; return; }
+  if ($('hud').hidden || !$('scoreSheet').hidden || !$('nameSheet').hidden || !$('holesSheet').hidden) return;
   const k = e.key.toLowerCase();
   if (e.code === 'Escape') { if (pull) cancelPull(); }
   else if (e.code === 'ArrowLeft') nudge(e.shiftKey ? 0.02 : 0.006);
@@ -2088,7 +2143,7 @@ function frame() {
     ballShadow.visible = game.phase !== 'menu' && agl < 3;
   }
   const grab = $('grab');
-  if (game.phase === 'address' && !pull && $('scoreSheet').hidden) {
+  if (game.phase === 'address' && !pull && $('scoreSheet').hidden && $('holesSheet').hidden) {
     camera.updateMatrixWorld(); const bs = ballScreen();
     grab.style.display = bs.onScreen ? 'block' : 'none';
     if (bs.onScreen) { grab.style.left = bs.x + 'px'; grab.style.top = bs.y + 'px'; }
@@ -2126,7 +2181,7 @@ function boot(hot) {
   else showLobby();
   window.claude?.hot?.snapshot?.(() => ({ started: game.phase !== 'menu', mode: game.mode, day: game.day, seq: game.seq, si: game.si, tee: game.tee, level: game.level, scores: game.scores }));
   requestAnimationFrame(frame);
-  window.__golf = { scene, POWER, COURSE, parOf, arroyoAt, game, hit, caddie, newAddress, HOLE_FW, F, CLIPS, clip, sfx, audio, defaultAim, world, surface, height, HOLES, CLUBS, carryTable: () => carryTable, trees, startHole, beginRound, dailyHoles, P, API, showLobby };
+  window.__golf = { scene, POWER, COURSE, parOf, arroyoAt, game, hit, caddie, newAddress, HOLE_FW, F, CLIPS, clip, sfx, audio, defaultAim, world, surface, height, HOLES, CLUBS, carryTable: () => carryTable, trees, startHole, beginRound, dailyHoles, P, API, showLobby, finishRound, jumpTo };
 }
 const start = data => { try { boot(data); } catch (err) { $('loading').textContent = 'Could not start: ' + err.message; throw err; } };
 window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
